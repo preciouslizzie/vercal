@@ -8,9 +8,9 @@ const API = axios.create({
 API.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
-    if (!token) return config;
-
-    config.headers.Authorization = `Bearer ${token}`;
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
     return config;
   },
   (error) => Promise.reject(error),
@@ -28,29 +28,39 @@ API.interceptors.response.use(
   },
 );
 
+// MEMBERS
 API.getMembers = () => API.get('/members');
 API.createMember = (data) => API.post('/members', data);
 API.updateMember = (id, data) => API.put(`/members/${id}`, data);
 API.deleteMember = (id) => API.delete(`/members/${id}`);
 
+// DONATIONS
 API.getDonations = () => API.get('/donations');
 API.createDonation = (data) => API.post('/donations', data);
 
+// WORKERS
 API.getWorkers = () => API.get('/workers');
 API.createWorker = (data) => API.post('/workers', data);
 API.updateWorker = (id, data) => API.put(`/workers/${id}`, data);
 API.deleteWorker = (id) => API.delete(`/workers/${id}`);
 
-API.getEvents = () => API.get('/events');
-API.createEvent = (data) => API.post('/events', data);
-API.updateEvent = (id, data) => API.put(`/events/${id}`, data);
-API.deleteEvent = (id) => API.delete(`/events/${id}`);
+// EVENTS
+export const getEvents = () => API.get('/event');
+export const createEvent = (formData) => API.post('/event', formData); // <-- no headers
+export const deleteEvent = (id) => API.delete(`/event/${id}`);
 
+// SERMONS
 API.getSermons = () => API.get('/audio');
 API.createSermon = (data) => API.post('/audio', data);
 API.updateSermon = (id, data) => API.put(`/audio/${id}`, data);
 API.deleteSermon = (id) => API.delete(`/audio/${id}`);
 
+// Blogs
+API.getBlogs = () => API.get('/blogs');
+API.createBlog = (data) => API.post('/blogs', data);
+API.updateBlog = (id, data) => API.put(`/blogs/${id}`, data);
+API.deleteBlog = (id) => API.delete(`/blogs/${id}`);
+// RECORDS
 API.getRecords = () => API.get('/records');
 
 export default API;

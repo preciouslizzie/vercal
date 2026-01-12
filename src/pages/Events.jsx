@@ -1,14 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { fetchEvents, createEvent, deleteEvent } from '../api/api';
+import { getEvents, createEvent, deleteEvent } from '../api/api';
 
 function Events() {
   const [events, setEvents] = useState([]);
+  const [file] = useState(null);
   const [form, setForm] = useState({
-    title: '',
-    description: '',
+    name: '',
+    event: '',
     date: '',
     time: '',
     venue: '',
+    picture: '',
   });
 
   useEffect(() => {
@@ -16,20 +18,32 @@ function Events() {
   }, []);
 
   const load = async () => {
-    const res = await fetchEvents();
+    const res = await getEvents();
     setEvents(res.data);
   };
 
-  const submit = async () => {
-    await createEvent(form);
-    setForm({ title: '', description: '', date: '', time: '', venue: '' });
+  const handleCreate = async () => {
+    const formData = new FormData();
+    formData.append('name', form.name);
+    formData.append('event', form.description);
+    formData.append('date', form.date);
+    formData.append('time', form.time);
+    formData.append('venue', form.venue);
+    formData.append('picture', file);
+    if (form.picture) {
+      formData.append('picture', form.picture);
+    }
+
+    await createEvent(formData);
+
+    setForm({ name: '', event: '', date: '', time: '', picture: null });
     load();
   };
 
-  const remove = async (id) => {
+  const handleDelete = async (id) => {
     if (!window.confirm('Delete this event?')) return;
     await deleteEvent(id);
-    load();
+    await load();
   };
 
   return (
@@ -39,16 +53,16 @@ function Events() {
       <div className="space-y-2 mb-6">
         <input
           className="border p-2 w-full"
-          placeholder="Title"
-          value={form.title}
-          onChange={(e) => setForm({ ...form, title: e.target.value })}
+          placeholder="Event name"
+          value={form.name}
+          onChange={(e) => setForm({ ...form, name: e.target.value })}
         />
 
         <input
           className="border p-2 w-full"
-          placeholder="Venue"
-          value={form.venue}
-          onChange={(e) => setForm({ ...form, venue: e.target.value })}
+          placeholder="Event description"
+          value={form.event}
+          onChange={(e) => setForm({ ...form, event: e.target.value })}
         />
 
         <input
@@ -64,16 +78,23 @@ function Events() {
           value={form.time}
           onChange={(e) => setForm({ ...form, time: e.target.value })}
         />
+        <input
+          type="file"
+          accept="image/*"
+          onChange={(e) => setForm({ ...form, picture: e.target.files[0] })}
+          className="border p-2 w-full"
+        />
 
         <textarea
           className="border p-2 w-full"
-          placeholder="Description"
-          value={form.description}
-          onChange={(e) => setForm({ ...form, description: e.target.value })}
+          placeholder="Vene"
+          value={form.venue}
+          onChange={(e) => setForm({ ...form, venue: e.target.value })}
         />
 
         <button
-          onClick={submit}
+          type="button"
+          onClick={handleCreate}
           className="bg-indigo-600 text-white px-4 py-2 rounded"
         >
           Create Event
@@ -83,12 +104,15 @@ function Events() {
       {events.map((e) => (
         <div key={e.id} className="border p-4 mb-3 rounded">
           <h4 className="font-bold">{e.title}</h4>
-          <p className="text-sm">{e.date} @ {e.time} | {e.venue}</p>
+          <p className="text-sm">
+            {e.date} @ {e.time} | {e.venue}
+          </p>
           <p className="mt-2">{e.description}</p>
 
           <button
-            onClick={() => remove(e.id)}
-            className="text-red-600 mt-2"
+            type="button"
+            onClick={() => handleDelete(e.id)}
+            className="mt-2 text-red-600"
           >
             Delete
           </button>

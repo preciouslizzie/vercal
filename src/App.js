@@ -5,13 +5,17 @@ import { TooltipComponent } from '@syncfusion/ej2-react-popups';
 
 import { Navbar, Footer, Sidebar, ThemeSettings } from './components';
 import {
-  Orders, Employees, Customers, Kanban,
+   Employees,  Kanban,
   Line, Area, Bar, Pie, Financial, ColorPicker,
-  ColorMapping, Editor, Pyramid, Stacked,
+  ColorMapping, Pyramid, Stacked,
 } from './pages';
 
 import Login from './pages/Login';
 import Sermons from './pages/Sermons';
+import Donations from './pages/Donations';
+import Members from './pages/Members';
+import Events from './pages/Events';
+import Blogs from './pages/Blogs';
 import Register from './pages/Register';
 import ProtectedRoute from './components/ProtectedRoute';
 import { useStateContext } from './contexts/ContextProvider';
@@ -57,11 +61,12 @@ const DashboardLayout = () => {
           <Routes>
             <Route index element={<Sermons />} />
             <Route path="sermons" element={<Sermons />} />
-            <Route path="orders" element={<Orders />} />
+            <Route path="donations" element={<Donations />} />
             <Route path="employees" element={<Employees />} />
-            <Route path="customers" element={<Customers />} />
+            <Route path="members" element={<Members />} />
+            <Route path="blogs" element={<Blogs />} />
             <Route path="kanban" element={<Kanban />} />
-            <Route path="editor" element={<Editor />} />
+            <Route path="events" element={<Events />} />
             <Route path="color-picker" element={<ColorPicker />} />
 
             {/* Charts */}
