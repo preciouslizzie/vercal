@@ -491,21 +491,21 @@ export const links = [
         icon: <RiContactsLine />,
         roles: ['admin', 'user'],
       },
-      {
-        name: 'workers',
-        icon: <IoMdContacts />,
-        roles: ['admin'],
-      },
+      // {
+      //   name: 'workers',
+      //   icon: <IoMdContacts />,
+      //   roles: ['admin'],
+      // },
       {
         name: 'donations',
         icon: <AiOutlineShoppingCart />,
         roles: ['admin', 'user'],
       },
-      {
-        name: 'records',
-        icon: <FiPieChart />,
-        roles: ['admin'],
-      },
+      // {
+      //   name: 'records',
+      //   icon: <FiPieChart />,
+      //   roles: ['admin'],
+      // },
     ],
   },
 
@@ -530,37 +530,37 @@ export const links = [
     ],
   },
 
-  {
-    title: 'Reports',
-    links: [
-      {
-        name: 'attendance',
-        icon: <AiOutlineStock />,
-      },
-      {
-        name: 'growth',
-        icon: <AiOutlineAreaChart />,
-      },
-      {
-        name: 'finance',
-        icon: <AiOutlineBarChart />,
-      },
-    ],
-  },
+  // {
+  //   title: 'Reports',
+  //   links: [
+  //     {
+  //       name: 'attendance',
+  //       icon: <AiOutlineStock />,
+  //     },
+  //     {
+  //       name: 'growth',
+  //       icon: <AiOutlineAreaChart />,
+  //     },
+  //     {
+  //       name: 'finance',
+  //       icon: <AiOutlineBarChart />,
+  //     },
+  //   ],
+  // },
 
-  {
-    title: 'Analytics',
-    links: [
-      {
-        name: 'members-analytics',
-        icon: <RiStockLine />,
-      },
-      {
-        name: 'donations-analytics',
-        icon: <BsBarChart />,
-      },
-    ],
-  },
+  // {
+  //   title: 'Analytics',
+  //   links: [
+  //     {
+  //       name: 'members-analytics',
+  //       icon: <RiStockLine />,
+  //     },
+  //     {
+  //       name: 'donations-analytics',
+  //       icon: <BsBarChart />,
+  //     },
+  //   ],
+  // },
 ];
 
 export const cartData = [

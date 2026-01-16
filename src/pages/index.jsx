@@ -1,7 +1,7 @@
 export { default as Ecommerce } from './Donations';
 export { default as Kanban } from './Kanban';
 export { default as Orders } from './Records';
-export { default as Employees } from './Workers';
+// export { default as Employees } from './Workers';
 export { default as Editor } from './Sermons';
 export { default as Customers } from './Members';
 export { default as ColorPicker } from './ColorPicker';

@@ -28,4 +28,4 @@ const Records = () => {
     </div>
   );
 };
-export default Records;
+export default Records ;

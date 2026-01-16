@@ -5,7 +5,7 @@ import { TooltipComponent } from '@syncfusion/ej2-react-popups';
 
 import { Navbar, Footer, Sidebar, ThemeSettings } from './components';
 import {
-   Employees,  Kanban,
+  Kanban,
   Line, Area, Bar, Pie, Financial, ColorPicker,
   ColorMapping, Pyramid, Stacked,
 } from './pages';
@@ -14,6 +14,7 @@ import Login from './pages/Login';
 import Sermons from './pages/Sermons';
 import Donations from './pages/Donations';
 import Members from './pages/Members';
+import Dashboard from './pages/Dashboard';
 import Events from './pages/Events';
 import Blogs from './pages/Blogs';
 import Register from './pages/Register';
@@ -62,8 +63,9 @@ const DashboardLayout = () => {
             <Route index element={<Sermons />} />
             <Route path="sermons" element={<Sermons />} />
             <Route path="donations" element={<Donations />} />
-            <Route path="employees" element={<Employees />} />
+            {/* <Route path="employees" element={<Employees />} /> */}
             <Route path="members" element={<Members />} />
+            <Route path="dashboard" element={<Dashboard />} />
             <Route path="blogs" element={<Blogs />} />
             <Route path="kanban" element={<Kanban />} />
             <Route path="events" element={<Events />} />
