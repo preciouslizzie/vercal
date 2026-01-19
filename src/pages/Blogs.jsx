@@ -126,12 +126,13 @@ const Blogs = () => {
   const [form, setForm] = useState({
     title: '',
     author: '',
-    content: '',
+    post: '',
   });
   const [image, setImage] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
+  const [actionLoading, setActionLoading] = useState(null);
 
   const perPage = 5;
 
@@ -159,7 +160,7 @@ const Blogs = () => {
   };
 
   const resetForm = () => {
-    setForm({ title: '', author: '', content: '' });
+    setForm({ title: '', author: '', post: '' });
     setImage(null);
     setEditingId(null);
   };
@@ -170,19 +171,24 @@ const Blogs = () => {
     const data = new FormData();
     data.append('title', form.title);
     data.append('author', form.author);
-    data.append('content', form.content);
+    data.append('post', form.content);
     if (image) data.append('image', image);
 
     try {
+      setActionLoading('update');
+
       if (editingId) {
         await API.updateBlog(editingId, data);
       } else {
         await API.createBlog(data);
       }
+
       resetForm();
       fetchBlogs();
     } catch (err) {
       console.error(err);
+    } finally {
+      setActionLoading(null);
     }
   };
 
@@ -190,18 +196,22 @@ const Blogs = () => {
     setForm({
       title: blog.title,
       author: blog.author,
-      content: blog.content,
+      post: blog.post,
     });
     setEditingId(blog.id);
   };
 
   const handleDelete = async (id) => {
     if (!window.confirm('Delete this blog?')) return;
+
     try {
+      setActionLoading(`delete-${id}`);
       await API.deleteBlog(id);
       fetchBlogs();
     } catch (err) {
       console.error(err);
+    } finally {
+      setActionLoading(null);
     }
   };
 
@@ -240,8 +250,8 @@ const Blogs = () => {
         />
 
         <ReactQuill
-          value={form.content}
-          onChange={(value) => setForm({ ...form, content: value })}
+          value={form.post}
+          onChange={(value) => setForm({ ...form, post: value })}
           style={{ marginBottom: '15px' }}
         />
 
@@ -275,24 +285,22 @@ const Blogs = () => {
       {/* ===== BLOG LIST ===== */}
       {paginatedBlogs.map((blog) => (
         <div key={blog.id} style={styles.card}>
-          <h2>{blog.title}</h2>
-
           {blog.image && (
             <img
-              src={blog.image}
+              src={API.defaults.baseURL + blog.image}
               alt={blog.title}
               style={styles.image}
             />
           )}
 
           <p style={styles.meta}>
-            {blog.author} • {blog.createdAt}
+            {blog.author || 'Admin'} .
+            {new Date(blog.created_at).toLocaleDateString()}
           </p>
 
           <div
-            dangerouslySetInnerHTML={{
-              __html: blog.content,
-            }}
+            style={{ lineHeight: '1.7', color: '#374151' }}
+            dangerouslySetInnerHTML={{ __html: blog.post }}
           />
 
           <div style={styles.actions}>
@@ -304,15 +312,19 @@ const Blogs = () => {
             </button>
             <button
               onClick={() => handleDelete(blog.id)}
-              style={styles.dangerBtn}
+              style={{
+                ...styles.dangerBtn,
+                opacity: actionLoading === `delete-${blog.id}` ? 0.6 : 1,
+                cursor: actionLoading ? 'not-allowed' : 'pointer',
+              }}
+              disabled={actionLoading === `delete-${blog.id}`}
             >
-              Delete
+              {actionLoading === `delete-${blog.id}` ? 'Deleting…' : 'Delete'}
             </button>
           </div>
         </div>
       ))}
 
-      {/* ===== PAGINATION ===== */}
       <div style={styles.pagination}>
         {[...Array(totalPages)].map((_, i) => (
           <button

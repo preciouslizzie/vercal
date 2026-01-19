@@ -4,7 +4,7 @@ const API = axios.create({
   baseURL: 'https://church.altoservices.net/api',
 });
 
-// Attach token
+// Attach tokená
 API.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
@@ -35,8 +35,8 @@ API.updateMember = (id, data) => API.put(`/members/${id}`, data);
 API.deleteMember = (id) => API.delete(`/members/${id}`);
 
 // DONATIONS
-API.getDonations = () => API.get('/donations');
-API.createDonation = (data) => API.post('/donations', data);
+API.getDonations = () => API.get('/pay');
+API.createDonation = (data) => API.post('/pay', data);
 
 // WORKERS
 API.getWorkers = () => API.get('/workers');
@@ -57,9 +57,17 @@ API.deleteSermon = (id) => API.delete(`/audio/${id}`);
 
 // Blogs
 API.getBlogs = () => API.get('/blogs');
-API.createBlog = (data) => API.post('/blogs', data);
-API.updateBlog = (id, data) => API.put(`/blogs/${id}`, data);
-API.deleteBlog = (id) => API.delete(`/blogs/${id}`);
+API.createBlog = (data) => API.post('/blogs', data, {
+  headers: {
+    'Content-Type': 'multipart/form-data',
+  },
+});
+API.updateBlog = (id, data) => API.put(`/blog/${id}`, data, {
+  headers: {
+    'Content-Type': 'multipart/form-data',
+  },
+});
+API.deleteBlog = (id) => API.delete(`/blog/${id}`);
 // RECORDS
 API.getRecords = () => API.get('/records');
 

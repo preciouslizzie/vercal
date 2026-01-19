@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { openUpload } from '@bytescale/upload-widget';
+import { UploadWidget } from '@bytescale/upload-widget';
 import { Header } from '../components';
 import API from '../api/api';
 
@@ -9,20 +9,39 @@ const Sermons = () => {
   const [loading, setLoading] = useState(false);
   const [sermons, setSermons] = useState([]);
   const uploadAudio = async () => {
-    const result = await openUpload({
-      apiKey: process.env.REACT_APP_BYTESCALE_KEY,
-      maxFileCount: 1,
-      mimeTypes: ['audio/*'],
+    console.log('UPLOAD FUNCTION CALLED');
+
+    return new Promise((resolve, reject) => {
+      UploadWidget.open({
+        apiKey: process.env.REACT_APP_BYTESCALE_KEY,
+        maxFileCount: 1,
+        mimeTypes: ['audio/*'],
+
+        onComplete: (files) => {
+          console.log('BYTESCALE FILES:', files);
+
+          if (!files || files.length === 0) {
+            reject(new Error('Upload cancelled'));
+            return;
+          }
+
+          const file = files[0];
+
+          resolve({
+            fileUrl: file.fileUrl, // ✅ public CDN URL
+            filePath: file.filePath,
+            etag: file.etag,
+          });
+        },
+
+        onError: (error) => {
+          reject(error);
+        },
+      });
     });
-
-    if (!result || result.length === 0) return;
-
-    const { fileUrl, filePath } = result[0];
-
-    console.log('Uploaded:', fileUrl, filePath);
   };
 
-  // ================= Load Sermons =================
+  //  Load Sermons
   const loadSermons = async () => {
     const res = await API.getSermons();
     setSermons(res.data);
@@ -42,7 +61,8 @@ const Sermons = () => {
     try {
       setLoading(true);
 
-      const audioData = await uploadAudio(audioFile);
+      const audioData = await uploadAudio();
+      console.log(audioData);
 
       await API.post('/audio', {
         title,
@@ -53,9 +73,7 @@ const Sermons = () => {
 
       setTitle('');
       setAudioFile(null);
-
       await loadSermons();
-      alert('Sermon published successfully');
     } catch (error) {
       console.log(error.response?.data);
       alert('Upload failed');

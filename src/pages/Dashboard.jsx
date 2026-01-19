@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   FaUsers,
   FaCalendarAlt,
@@ -7,45 +8,82 @@ import {
 } from 'react-icons/fa';
 import API from '../api/api';
 
-const StatCard = ({ title, value, icon, color }) => (
-  <div className="bg-white rounded-2xl shadow p-6 flex items-center gap-6 hover:shadow-lg transition">
-    <div className={`p-4 rounded-full text-white ${color}`}>
-      {icon}
-    </div>
-    <div>
-      <p className="text-gray-500 text-sm">{title}</p>
-      <h3 className="text-3xl font-bold text-gray-800">{value}</h3>
+const StatCard = ({ title, value, icon, color, onClick }) => (
+  <div
+    onClick={onClick} // use the passed prop
+    onKeyDown={(e) => e.key === 'Enter' && onClick?.()}
+    role="button"
+    tabIndex={0}
+    className="
+      bg-white
+      p-5 sm:p-6
+      rounded-2xl
+      shadow
+      cursor-pointer
+      transition-all
+      duration-300
+      hover:shadow-xl
+      hover:-translate-y-1
+      focus:outline-none
+      focus:ring-2
+      focus:ring-indigo-500
+      focus:ring-offset-2
+    "
+  >
+    <div className="flex items-center justify-between">
+      <div>
+        <p className="text-gray-500 text-sm">{title}</p>
+        <h2 className="text-2xl sm:text-3xl font-bold text-gray-800 mt-1">
+          {value}
+        </h2>
+        <p className="text-xs text-gray-400 mt-1">
+          View details →
+        </p>
+      </div>
+
+      <div
+        className={`
+          text-white
+          text-xl sm:text-2xl
+          p-3 sm:p-4
+          rounded-full
+          ${color}
+        `}
+      >
+        {icon}
+      </div>
     </div>
   </div>
 );
 
 const Dashboard = () => {
+  const navigate = useNavigate();
+
   const [stats, setStats] = useState({
     members: 0,
     events: 0,
-    audio: 0,
-    pay: 0,
+    audios: 0,
+    Donations: 0,
   });
 
   const [loading, setLoading] = useState(true);
 
   const loadStats = async () => {
     setLoading(true);
-
     try {
-      const membersRes = await API.get('/members').catch(() => ({ data: [] }));
-      const eventsRes = await API.get('/events').catch(() => ({ data: [] }));
-      const sermonsRes = await API.get('/audio').catch(() => ({ data: [] }));
-      const donationsRes = await API.get('/pay').catch(() => ({ data: [] }));
+      const [members, events, sermons, donations] = await Promise.all([
+        API.get('/members').catch(() => ({ data: [] })),
+        API.get('/events').catch(() => ({ data: [] })),
+        API.get('/audio').catch(() => ({ data: [] })),
+        API.get('/pay').catch(() => ({ data: [] })),
+      ]);
 
       setStats({
-        members: membersRes.data?.length || 0,
-        events: eventsRes.data?.length || 0,
-        audio: sermonsRes.data?.length || 0,
-        pay: donationsRes.data?.length || 0,
+        members: members.data.length,
+        events: events.data.length,
+        sermons: sermons.data.length,
+        donations: donations.data.length,
       });
-    } catch (error) {
-      console.error('Dashboard error:', error);
     } finally {
       setLoading(false);
     }
@@ -57,20 +95,10 @@ const Dashboard = () => {
 
   return (
     <div className="p-6 bg-gray-100 min-h-screen">
+      <h1 className="text-3xl font-bold mb-6">Church Dashboard</h1>
 
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-800">
-          Church Dashboard
-        </h1>
-        <p className="text-gray-500">
-          Overview of church activities and records
-        </p>
-      </div>
-
-      {/* Stats */}
       {loading ? (
-        <div className="text-center text-gray-400 py-20">
+        <div className="text-center py-20 text-gray-400">
           Loading dashboard...
         </div>
       ) : (
@@ -78,42 +106,36 @@ const Dashboard = () => {
           <StatCard
             title="Members"
             value={stats.members}
-            icon={<FaUsers size={28} />}
+            icon={<FaUsers />}
             color="bg-indigo-600"
+            onClick={() => navigate('/members')}
           />
+
           <StatCard
             title="Events"
             value={stats.events}
-            icon={<FaCalendarAlt size={28} />}
+            icon={<FaCalendarAlt />}
             color="bg-emerald-600"
+            onClick={() => navigate('/events')}
           />
+
           <StatCard
             title="Sermons"
-            value={stats.audio}
-            icon={<FaBible size={28} />}
+            value={stats.sermons}
+            icon={<FaBible />}
             color="bg-amber-600"
+            onClick={() => navigate('/sermons')}
           />
+
           <StatCard
             title="Donations"
-            value={stats.pay}
-            icon={<FaDonate size={28} />}
+            value={stats.donations}
+            icon={<FaDonate />}
             color="bg-rose-600"
+            onClick={() => navigate('/donations')}
           />
         </div>
       )}
-
-      {/* Welcome, Panel */}
-      <div className="mt-10 bg-white rounded-2xl shadow p-8">
-        <h2 className="text-xl font-semibold text-gray-800 mb-2">
-          Welcome 👋
-        </h2>
-        <p className="text-gray-600 max-w-3xl">
-          This dashboard gives you a quick overview of your church operations.
-          Use the sidebar to manage members, events, sermons, and donations.
-          All data updates automatically from the backend.
-        </p>
-      </div>
-
     </div>
   );
 };
