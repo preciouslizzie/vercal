@@ -491,11 +491,11 @@ export const links = [
         icon: <RiContactsLine />,
         roles: ['admin', 'user'],
       },
-      // {
-      //   name: 'workers',
-      //   icon: <IoMdContacts />,
-      //   roles: ['admin'],
-      // },
+      {
+        name: 'Volunteer',
+        icon: <IoMdContacts />,
+        roles: ['admin'],
+      },
       {
         name: 'donations',
         icon: <AiOutlineShoppingCart />,

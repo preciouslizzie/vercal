@@ -21,6 +21,8 @@ import Register from './pages/Register';
 import ProtectedRoute from './components/ProtectedRoute';
 import { useStateContext } from './contexts/ContextProvider';
 import './App.css';
+import VolunteerDashboard from './pages/Volunteer/VolunteerDashboard';
+
 
 const DashboardLayout = () => {
   const {
@@ -63,6 +65,7 @@ const DashboardLayout = () => {
             <Route index element={<Sermons />} />
             <Route path="sermons" element={<Sermons />} />
             <Route path="donations" element={<Donations />} />
+            <Route path="volunteer" element={<VolunteerDashboard />} />
             {/* <Route path="employees" element={<Employees />} /> */}
             <Route path="members" element={<Members />} />
             <Route path="dashboard" element={<Dashboard />} />

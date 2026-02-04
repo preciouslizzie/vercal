@@ -64,6 +64,7 @@ const Dashboard = () => {
     events: 0,
     audios: 0,
     Donations: 0,
+    volunteer: 0,
   });
 
   const [loading, setLoading] = useState(true);
