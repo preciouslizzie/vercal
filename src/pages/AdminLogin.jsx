@@ -1,15 +1,25 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useStateContext } from '../contexts/ContextProvider';
+import { adminLogin } from '../services/adminAuth';
 
-const Login = () => {
-  const { login } = useStateContext();
+export default function AdminLogin() {
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const token = localStorage.getItem('admin_token');
+    const admin = JSON.parse(localStorage.getItem('admin_user') || '{}');
+
+    if (token && admin.role === 'admin') {
+      navigate('/dashboard');
+    }
+  }, [navigate]);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [errorDetails, setErrorDetails] = useState(null);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -17,10 +27,23 @@ const Login = () => {
     setLoading(true);
 
     try {
-      await login({ email, password });
+      const data = await adminLogin(email, password);
+
+      console.debug('Login response data:', data);
+
+      // Store admin token & data
+      localStorage.setItem('admin_token', data.token);
+      localStorage.setItem('admin_user', JSON.stringify(data.admin));
+
       navigate('/dashboard');
     } catch (err) {
-      setError(err.response?.data?.message || 'Login failed');
+      console.error('Admin login error:', err);
+      const serverMessage = err.response?.data?.message;
+      const serverData = err.response?.data;
+      const statusText = err.response?.statusText;
+
+      setError(serverMessage || statusText || err.message || 'Login failed. Please check your credentials.');
+      setErrorDetails(serverData || { message: err.message });
     } finally {
       setLoading(false);
     }
@@ -30,30 +53,47 @@ const Login = () => {
     <div style={styles.page}>
       <div style={styles.card}>
         <h2 style={styles.title}>Welcome Back 👋</h2>
-        <p style={styles.subtitle}>
-          Sign in to your admin dashboard
-        </p>
+        <p style={styles.subtitle}>Sign in to your admin dashboard</p>
 
         {error && <p style={styles.error}>{error}</p>}
+        {errorDetails && (
+          <pre style={styles.errorDetails}>{JSON.stringify(errorDetails, null, 2)}</pre>
+        )}
 
         <form onSubmit={handleSubmit} style={styles.form}>
           <input
             type="email"
+            id="email"
+            name="email"
             placeholder="Email address"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             style={styles.input}
+            autoComplete="email"
             required
           />
 
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            style={styles.input}
-            required
-          />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input
+              id="password"
+              name="password"
+              type={showPassword ? 'text' : 'password'}
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              style={{ ...styles.input, flex: 1 }}
+              autoComplete="current-password"
+              required
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((s) => !s)}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+              style={styles.toggleButton}
+            >
+              {showPassword ? 'Hide' : 'Show'}
+            </button>
+          </div>
 
           <button
             type="submit"
@@ -76,7 +116,7 @@ const Login = () => {
       </div>
     </div>
   );
-};
+}
 
 const styles = {
   page: {
@@ -147,6 +187,12 @@ const styles = {
     fontWeight: 600,
     textDecoration: 'none',
   },
+  toggleButton: {
+    padding: '8px 10px',
+    fontSize: 13,
+    borderRadius: 8,
+    border: '1px solid #ddd',
+    background: '#f6f6f6',
+    cursor: 'pointer',
+  },
 };
-
-export default Login;

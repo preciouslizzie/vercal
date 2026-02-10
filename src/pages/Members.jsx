@@ -16,8 +16,15 @@ const Members = () => {
 
   // Load Members
   const loadMembers = async () => {
-    const res = await API.get('/members');
-    setMembers(res.data);
+    try {
+      const res = await API.get('/members');
+      setMembers(res.data);
+    } catch (err) {
+      console.error('Failed to load members:', err);
+      const message = err.response?.data?.message || err.message || 'Failed to load members';
+      alert(`Error loading members: ${message}`);
+      setMembers([]);
+    }
   };
 
   useEffect(() => {

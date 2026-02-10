@@ -10,21 +10,22 @@ import {
   ColorMapping, Pyramid, Stacked,
 } from './pages';
 
-import Login from './pages/Login';
+import AdminLogin from './pages/AdminLogin';
+import Register from './pages/Register';
 import Sermons from './pages/Sermons';
 import Donations from './pages/Donations';
 import Members from './pages/Members';
-import Dashboard from './pages/Dashboard';
 import Events from './pages/Events';
 import Blogs from './pages/Blogs';
-import Register from './pages/Register';
-import ProtectedRoute from './components/ProtectedRoute';
-import { useStateContext } from './contexts/ContextProvider';
-import './App.css';
 import VolunteerDashboard from './pages/Volunteer/VolunteerDashboard';
 
+import AdminProtectedRoute from './components/AdminProtectedRoute';
+import { useStateContext } from './contexts/ContextProvider';
 
-const DashboardLayout = () => {
+import './App.css';
+
+// 🔹 RENAMED: this is a LAYOUT, not the Dashboard page
+const AdminLayout = () => {
   const {
     activeMenu,
     currentColor,
@@ -55,7 +56,7 @@ const DashboardLayout = () => {
         </div>
       )}
 
-      {/* Main */}
+      {/* Main Content */}
       <div className={`min-h-screen w-full ${activeMenu ? 'md:ml-72' : ''}`}>
         <Navbar />
         {themeSettings && <ThemeSettings />}
@@ -66,9 +67,8 @@ const DashboardLayout = () => {
             <Route path="sermons" element={<Sermons />} />
             <Route path="donations" element={<Donations />} />
             <Route path="volunteer" element={<VolunteerDashboard />} />
-            {/* <Route path="employees" element={<Employees />} /> */}
             <Route path="members" element={<Members />} />
-            <Route path="dashboard" element={<Dashboard />} />
+            <Route path="adminLogin" element={<AdminLogin />} />
             <Route path="blogs" element={<Blogs />} />
             <Route path="kanban" element={<Kanban />} />
             <Route path="events" element={<Events />} />
@@ -98,33 +98,34 @@ const App = () => {
   useEffect(() => {
     const color = localStorage.getItem('colorMode');
     const mode = localStorage.getItem('themeMode');
+
     if (color && mode) {
       setCurrentColor(color);
       setCurrentMode(mode);
     }
-  }, []);
+  }, [setCurrentColor, setCurrentMode]);
 
   return (
     <div className={currentMode === 'Dark' ? 'dark' : ''}>
       <BrowserRouter>
         <Routes>
 
-          {/* PUBLIC ROUTES */}
-          <Route path="/login" element={<Login />} />
+          {/* PUBLIC */}
+          <Route path="/login" element={<AdminLogin />} />
           <Route path="/register" element={<Register />} />
 
-          {/* PROTECTED DASHBOARD */}
+          {/* ADMIN ONLY */}
           <Route
-            path="/*"
+            path="/dashboard/*"
             element={(
-              <ProtectedRoute>
-                <DashboardLayout />
-              </ProtectedRoute>
+              <AdminProtectedRoute>
+                <AdminLayout />
+              </AdminProtectedRoute>
                           )}
           />
 
           {/* FALLBACK */}
-          <Route path="*" element={<Navigate to="/login" />} />
+          <Route path="*" element={<Navigate to="/login" replace />} />
 
         </Routes>
       </BrowserRouter>

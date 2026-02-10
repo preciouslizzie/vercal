@@ -6,7 +6,7 @@ const API = axios.create({
 
 API.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('admin_token');
 
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -36,7 +36,8 @@ API.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('token');
+      localStorage.removeItem('admin_token');
+      localStorage.removeItem('admin_user');
       window.location.href = '/login';
     }
     return Promise.reject(error);
@@ -73,6 +74,10 @@ API.createGroupPost = (groupId, data) => API.post(`/volunteer/groups/${groupId}/
 API.getMyHoursWorked = () => API.get('/volunteer/hours-worked');
 
 API.submitAvailability = (data) => API.post('/availability/hours-worked', data);
+
+/* SCHEDULE */
+API.getSchedules = () => API.get('/schedules');
+API.createSchedule = (data) => API.post('/schedules', data); // admin
 
 API.getMembers = () => API.get('/members');
 API.createMember = (data) => API.post('/members', data);

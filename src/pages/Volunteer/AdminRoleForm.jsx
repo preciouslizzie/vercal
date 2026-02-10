@@ -1,16 +1,25 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import API from '../../api/api';
 
 export default function AdminRoleForm({ roles, onAdd }) {
-  const [form, setForm] = useState({
-    name: '',
-    availability: '',
-  });
+  const [form, setForm] = useState({ name: '', availability: '' });
+  const [remoteRoles, setRemoteRoles] = useState(roles || []);
+
+  useEffect(() => {
+    API.getVolunteerRoles().then((res) => setRemoteRoles(res.data)).catch(() => {});
+  }, []);
 
   const submit = () => {
     if (!form.name || !form.availability) return;
 
-    onAdd((prev) => [...prev, form]);
-    setForm({ name: '', availability: '' });
+    API.createVolunteerRole(form)
+      .then((res) => {
+        const created = res.data;
+        onAdd((prev) => [...prev, created]);
+        setRemoteRoles((r) => [...r, created]);
+        setForm({ name: '', availability: '' });
+      })
+      .catch(() => alert('Failed to create role'));
   };
 
   return (
@@ -43,9 +52,9 @@ export default function AdminRoleForm({ roles, onAdd }) {
         </button>
       </div>
 
-      {roles.length > 0 && (
+      {remoteRoles.length > 0 && (
         <div className="mt-4 space-y-2 text-sm">
-          {roles.map((r, i) => (
+          {remoteRoles.map((r, i) => (
             <div
               key={i}
               className="flex justify-between rounded-md bg-gray-50 px-4 py-2"
