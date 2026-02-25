@@ -21,13 +21,14 @@ export default function AdminTab() {
 
   // Roles State
   const [roles, setRoles] = useState([]);
+  const [users, setUsers] = useState([]);
   const [showRoleForm, setShowRoleForm] = useState(false);
   const [roleForm, setRoleForm] = useState({ name: '', availability_required: '' });
 
   // Schedules State
   const [schedules, setSchedules] = useState([]);
   const [showScheduleForm, setShowScheduleForm] = useState(false);
-  const [scheduleForm, setScheduleForm] = useState({ role_id: '', date: '', time_start: '', time_end: '', location: '' });
+  const [scheduleForm, setScheduleForm] = useState({ user_id: '', role_id: '', date: '', start_time: '', end_time: '', location: '' });
 
   // Announcements State
   const [announcements, setAnnouncements] = useState([]);
@@ -41,7 +42,6 @@ export default function AdminTab() {
   const [attendance, setAttendance] = useState([]);
   const [showAttendanceForm, setShowAttendanceForm] = useState(false);
   const [attendanceForm, setAttendanceForm] = useState({
-    volunteer_id: '',
     date: new Date().toISOString().split('T')[0],
     hours: '',
   });
@@ -88,15 +88,22 @@ export default function AdminTab() {
         const res = await adminAPI.getApplications();
         setApplications(res.data || []);
       } else if (section === 'roles') {
+
         const res = await adminAPI.getRoles();
         setRoles(res.data || []);
       } else if (section === 'schedules') {
-        const [schedRes, rolesRes] = await Promise.all([
+        const [schedRes, rolesRes, usersRes] = await Promise.all([
           adminAPI.getSchedules(),
           adminAPI.getRoles(),
+          adminAPI.getUsers(),
         ]);
-        setSchedules(schedRes.data || []);
+        setSchedules(
+  Array.isArray(schedRes.data)
+    ? schedRes.data
+    : schedRes.data?.schedules || []
+);
         setRoles(rolesRes.data || []);
+        setUsers(usersRes.data || []);
       } else if (section === 'announcements') {
         const [annoRes, rolesRes] = await Promise.all([
           adminAPI.getAnnouncements(),
@@ -165,13 +172,13 @@ export default function AdminTab() {
 
   const handleAddSchedule = async (e) => {
     e.preventDefault();
-    if (!scheduleForm.role_id || !scheduleForm.date || !scheduleForm.time_start) {
+    if (!scheduleForm.role_id || !scheduleForm.date || !scheduleForm.start_time) {
       return alert('Role, date, time required');
     }
     try {
       const res = await adminAPI.createSchedule(scheduleForm);
       setSchedules((prev) => [...prev, res.data]);
-      setScheduleForm({ role_id: '', date: '', time_start: '', time_end: '', location: '' });
+      setScheduleForm({ user_id: '', role_id: '', date: '', start_time: '', end_time: '', location: '' });
       setShowScheduleForm(false);
       loadStats();
     } catch (err) {
@@ -353,13 +360,17 @@ export default function AdminTab() {
             </div>
             {showScheduleForm && (
               <form onSubmit={handleAddSchedule} className="bg-gray-50 rounded-lg p-4 space-y-3">
+                <select value={scheduleForm.user_id} onChange={(e) => setScheduleForm({ ...scheduleForm, user_id: e.target.value })} className="w-full border rounded px-3 py-2" required>
+                  <option value="">Select User</option>
+                  {users.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}
+                </select>
                 <select value={scheduleForm.role_id} onChange={(e) => setScheduleForm({ ...scheduleForm, role_id: e.target.value })} className="w-full border rounded px-3 py-2" required>
                   <option value="">Select Role</option>
                   {roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
                 </select>
                 <input type="date" value={scheduleForm.date} onChange={(e) => setScheduleForm({ ...scheduleForm, date: e.target.value })} className="w-full border rounded px-3 py-2" required />
-                <input type="time" value={scheduleForm.time_start} onChange={(e) => setScheduleForm({ ...scheduleForm, time_start: e.target.value })} className="w-full border rounded px-3 py-2" required />
-                <input type="time" value={scheduleForm.time_end} onChange={(e) => setScheduleForm({ ...scheduleForm, time_end: e.target.value })} className="w-full border rounded px-3 py-2" placeholder="End time" />
+                <input type="time" value={scheduleForm.start_time} onChange={(e) => setScheduleForm({ ...scheduleForm, start_time: e.target.value })} className="w-full border rounded px-3 py-2" required />
+                <input type="time" value={scheduleForm.end_time} onChange={(e) => setScheduleForm({ ...scheduleForm, end_time: e.target.value })} className="w-full border rounded px-3 py-2" placeholder="End time" />
                 <input type="text" placeholder="Location" value={scheduleForm.location} onChange={(e) => setScheduleForm({ ...scheduleForm, location: e.target.value })} className="w-full border rounded px-3 py-2" />
                 <button type="submit" className="w-full bg-blue-500 text-white py-2 rounded font-medium">Add Schedule</button>
               </form>
@@ -368,6 +379,7 @@ export default function AdminTab() {
               <table className="w-full text-sm">
                 <thead className="bg-gray-100 border-b">
                   <tr>
+                    <th className="px-4 py-3 text-left">User</th>
                     <th className="px-4 py-3 text-left">Role</th>
                     <th className="px-4 py-3 text-left">Date</th>
                     <th className="px-4 py-3 text-left">Time</th>
@@ -376,11 +388,13 @@ export default function AdminTab() {
                   </tr>
                 </thead>
                 <tbody>
-                  {schedules.map((sched) => (
+                  {Array.isArray(schedules) &&
+              schedules.map((sched) => (
                     <tr key={sched.id} className="border-b hover:bg-gray-50">
+                      <td className="px-4 py-3">{sched.user?.name}</td>
                       <td className="px-4 py-3">{roles.find((r) => r.id === sched.role_id)?.name || 'N/A'}</td>
                       <td className="px-4 py-3">{sched.date?.split(' ')[0]}</td>
-                      <td className="px-4 py-3">{sched.time_start} {sched.time_end && `- ${sched.time_end}`}</td>
+                      <td className="px-4 py-3">{sched.start_time} {sched.end_time && `- ${sched.end_time}`}</td>
                       <td className="px-4 py-3">{sched.location || '-'}</td>
                       <td className="px-4 py-3 text-center">
                         <button onClick={() => handleDeleteSchedule(sched.id)} className="text-red-500 hover:text-red-700 font-medium">Delete</button>
@@ -463,7 +477,21 @@ export default function AdminTab() {
             </div>
             {showAttendanceForm && (
               <form onSubmit={handleLogAttendance} className="bg-gray-50 rounded-lg p-4 space-y-3">
-                <input type="number" placeholder="Volunteer ID" value={attendanceForm.volunteer_id} onChange={(e) => setAttendanceForm({ ...attendanceForm, volunteer_id: e.target.value })} className="w-full border rounded px-3 py-2" required />
+                <select
+  value={attendanceForm.volunteer_id}
+  onChange={(e) =>
+    setAttendanceForm({ ...attendanceForm, volunteer_id: e.target.value })
+  }
+>
+  <option value="">Select Volunteer</option>
+  {applications
+    .filter(app => app.status === 'approved')
+    .map(app => (
+      <option key={app.user.id} value={app.user.id}>
+        {app.user.name}
+      </option>
+  ))}
+</select>
                 <input type="date" value={attendanceForm.date} onChange={(e) => setAttendanceForm({ ...attendanceForm, date: e.target.value })} className="w-full border rounded px-3 py-2" required />
                 <input type="number" step="0.5" placeholder="Hours" value={attendanceForm.hours} onChange={(e) => setAttendanceForm({ ...attendanceForm, hours: e.target.value })} className="w-full border rounded px-3 py-2" required />
                 <button type="submit" className="w-full bg-blue-500 text-white py-2 rounded font-medium">Log</button>

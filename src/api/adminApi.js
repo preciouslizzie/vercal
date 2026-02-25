@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const adminApi = axios.create({
-  baseURL: process.env.REACT_APP_API_URL ||     'http://127.0.0.1:8000/api',
+  baseURL: process.env.REACT_APP_API_URL ||     'https://lizzy.altoservices.org/api',
   headers: {
     'Content-Type': 'application/json',
     Accept: 'application/json',
@@ -29,6 +29,7 @@ export const approveApplication = (id) => adminApi.put(`/admin/applications/${id
 
 // =============== SCHEDULES ===============
 export const getSchedules = () => adminApi.get('/admin/schedules');
+export const getUsers = () => adminApi.get('/admin/users');
 export const createSchedule = (data) => adminApi.post('/admin/schedules', data);
 export const updateSchedule = (id, data) => adminApi.put(`/admin/schedules/${id}`, data);
 export const deleteSchedule = (id) => adminApi.delete(`/admin/schedules/${id}`);

@@ -1,15 +1,51 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { FiEye, FiEyeOff } from 'react-icons/fi';
 import { adminLogin } from '../services/adminAuth';
+
+const ALLOWED_ROLES = ['admin', 'superadmin'];
+const normalizeRole = (value) => String(value || '').toLowerCase().replace(/[_\s-]/g, '');
+const pickToken = (payload) => (
+  payload?.token
+  || payload?.access_token
+  || payload?.auth_token
+  || payload?.jwt
+  || payload?.data?.token
+  || payload?.data?.access_token
+  || payload?.data?.auth_token
+  || payload?.data?.jwt
+  || ''
+);
+const pickAdmin = (payload) => (
+  payload?.admin
+  || payload?.user
+  || payload?.account
+  || payload?.data?.admin
+  || payload?.data?.user
+  || payload?.data?.account
+  || {}
+);
 
 export default function AdminLogin() {
   const navigate = useNavigate();
+  const isMountedRef = useRef(true);
+
+  useEffect(() => () => {
+    isMountedRef.current = false;
+  }, []);
 
   useEffect(() => {
     const token = localStorage.getItem('admin_token');
-    const admin = JSON.parse(localStorage.getItem('admin_user') || '{}');
+    let admin = {};
+    try {
+      admin = JSON.parse(localStorage.getItem('admin_user') || '{}');
+    } catch {
+      admin = {};
+    }
+    const role = normalizeRole(admin.role || admin.user_role || admin.userType || admin.type);
+    const hasAllowedRole = !role || ALLOWED_ROLES.includes(role);
 
-    if (token && admin.role === 'admin') {
+    if (token && hasAllowedRole) {
       navigate('/dashboard');
     }
   }, [navigate]);
@@ -31,9 +67,20 @@ export default function AdminLogin() {
 
       console.debug('Login response data:', data);
 
+      const token = pickToken(data);
+      const admin = pickAdmin(data);
+      const role = normalizeRole(admin.role || admin.user_role || admin.userType || admin.type || data?.role);
+
+      if (!token) {
+        throw new Error('Login succeeded but no token was returned by the server.');
+      }
+      if (role && !ALLOWED_ROLES.includes(role)) {
+        throw new Error(`Access denied for role: ${role}`);
+      }
+
       // Store admin token & data
-      localStorage.setItem('admin_token', data.token);
-      localStorage.setItem('admin_user', JSON.stringify(data.admin));
+      localStorage.setItem('admin_token', token);
+      localStorage.setItem('admin_user', JSON.stringify(admin));
 
       navigate('/dashboard');
     } catch (err) {
@@ -42,10 +89,14 @@ export default function AdminLogin() {
       const serverData = err.response?.data;
       const statusText = err.response?.statusText;
 
-      setError(serverMessage || statusText || err.message || 'Login failed. Please check your credentials.');
-      setErrorDetails(serverData || { message: err.message });
+      if (isMountedRef.current) {
+        setError(serverMessage || statusText || err.message || 'Login failed. Please check your credentials.');
+        setErrorDetails(serverData || { message: err.message });
+      }
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
   };
 
@@ -73,7 +124,7 @@ export default function AdminLogin() {
             required
           />
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={styles.passwordWrap}>
             <input
               id="password"
               name="password"
@@ -81,7 +132,7 @@ export default function AdminLogin() {
               placeholder="Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              style={{ ...styles.input, flex: 1 }}
+              style={{ ...styles.input, ...styles.passwordInput }}
               autoComplete="current-password"
               required
             />
@@ -89,9 +140,9 @@ export default function AdminLogin() {
               type="button"
               onClick={() => setShowPassword((s) => !s)}
               aria-label={showPassword ? 'Hide password' : 'Show password'}
-              style={styles.toggleButton}
+              style={styles.passwordIconButton}
             >
-              {showPassword ? 'Hide' : 'Show'}
+              {showPassword ? <FiEyeOff /> : <FiEye />}
             </button>
           </div>
 
@@ -158,6 +209,26 @@ const styles = {
     border: '1px solid #ddd',
     outline: 'none',
   },
+  passwordWrap: {
+    position: 'relative',
+  },
+  passwordInput: {
+    width: '100%',
+    paddingRight: 46,
+    boxSizing: 'border-box',
+  },
+  passwordIconButton: {
+    position: 'absolute',
+    right: 10,
+    top: '50%',
+    transform: 'translateY(-50%)',
+    border: 'none',
+    background: 'transparent',
+    cursor: 'pointer',
+    fontSize: 16,
+    lineHeight: 1,
+    padding: 0,
+  },
   button: {
     marginTop: 10,
     padding: '12px',
@@ -186,13 +257,5 @@ const styles = {
     color: '#667eea',
     fontWeight: 600,
     textDecoration: 'none',
-  },
-  toggleButton: {
-    padding: '8px 10px',
-    fontSize: 13,
-    borderRadius: 8,
-    border: '1px solid #ddd',
-    background: '#f6f6f6',
-    cursor: 'pointer',
   },
 };

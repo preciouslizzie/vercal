@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const API = axios.create({
-  baseURL: 'http://127.0.0.1:8000/api',
+  baseURL: 'https://lizzy.altoservices.org/api',
 });
 
 API.interceptors.request.use(
@@ -16,6 +16,8 @@ API.interceptors.request.use(
   },
   (error) => Promise.reject(error),
 );
+export const adminLogin = (data) => API.post('/admin/login', data);
+export const getUsers = () => API.get('/admin/users');
 /* EVENTS */
 let baseURL;
 export const getEvents = () => axios.get(`${baseURL}/events/get.php`);

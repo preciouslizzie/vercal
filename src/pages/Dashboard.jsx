@@ -63,7 +63,7 @@ const Dashboard = () => {
     members: 0,
     events: 0,
     audios: 0,
-    Donations: 0,
+    donations: 0,
     volunteer: 0,
   });
 
@@ -72,7 +72,7 @@ const Dashboard = () => {
   const loadStats = async () => {
     setLoading(true);
     try {
-      const [members, events, sermons, donations, volunnteer] = await Promise.all([
+      const [members, events, sermons, donations, volunteer] = await Promise.all([
         API.get('/members').catch(() => ({ data: [] })),
         API.get('/events').catch(() => ({ data: [] })),
         API.get('/audio').catch(() => ({ data: [] })),
