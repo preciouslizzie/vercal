@@ -4,6 +4,7 @@ import * as adminAPI from '../../api/adminApi';
 export default function AdminTab() {
   const [managementSection, setManagementSection] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [loadingSection, setLoadingSection] = useState('');
   const [error, setError] = useState('');
 
   // Stats
@@ -46,6 +47,192 @@ export default function AdminTab() {
     hours: '',
   });
 
+  const parseApiError = (err, fallback = 'Something went wrong') => {
+    const message = err?.response?.data?.message;
+    if (message) return message;
+
+    const errors = err?.response?.data?.errors;
+    if (errors && typeof errors === 'object') {
+      const firstError = Object.values(errors).flat()[0];
+      if (firstError) return firstError;
+    }
+
+    return err?.message || fallback;
+  };
+
+  const toArray = (payload, nestedKeys = []) => {
+    if (Array.isArray(payload)) return payload;
+    if (!payload || typeof payload !== 'object') return [];
+
+    if (Array.isArray(payload.data)) return payload.data;
+
+    for (const key of nestedKeys) {
+      if (Array.isArray(payload[key])) return payload[key];
+      if (payload[key] && typeof payload[key] === 'object' && Array.isArray(payload[key].data)) {
+        return payload[key].data;
+      }
+    }
+
+    return [];
+  };
+
+  const normalizeRole = (role) => {
+    if (!role || typeof role !== 'object') return null;
+    const id = role.id ?? role.role_id;
+    if (id === null || id === undefined) return null;
+    return { ...role, id };
+  };
+
+  const resolveScheduleDate = (sched) => {
+    const extractDateFromString = (value) => {
+      if (typeof value !== 'string') return '';
+      const trimmed = value.trim();
+      if (!trimmed) return '';
+      if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(trimmed)) return '';
+
+      const isoMatch = trimmed.match(/\d{4}-\d{2}-\d{2}/);
+      if (isoMatch) return isoMatch[0];
+
+      const parsed = new Date(trimmed);
+      if (!Number.isNaN(parsed.getTime())) return parsed.toISOString().split('T')[0];
+
+      return '';
+    };
+
+    const candidates = [
+      sched?.date,
+      sched?.scheduleDate,
+      sched?.schedule_date,
+      sched?.scheduledDate,
+      sched?.scheduled_date,
+      sched?.scheduled_for,
+      sched?.scheduledFor,
+      sched?.service_day,
+      sched?.day,
+      sched?.event_date,
+      sched?.eventDate,
+      sched?.shift_date,
+      sched?.shiftDate,
+      sched?.duty_date,
+      sched?.service_date,
+      sched?.starts_at,
+      sched?.startsAt,
+      sched?.ends_at,
+      sched?.endsAt,
+      sched?.schedule?.date,
+      sched?.schedule?.scheduleDate,
+      sched?.schedule?.scheduled_date,
+      sched?.schedule?.scheduledDate,
+      sched?.schedule?.scheduled_for,
+      sched?.schedule?.scheduledFor,
+    ];
+
+    for (const value of candidates) {
+      if (!value) continue;
+      if (value instanceof Date && !Number.isNaN(value.getTime())) {
+        return value.toISOString().split('T')[0];
+      }
+      const extracted = extractDateFromString(value);
+      if (extracted) return extracted;
+    }
+
+    // Heuristic fallback for unknown backend keys (e.g. *_date, *Date, *_at).
+    for (const [key, value] of Object.entries(sched || {})) {
+      if (value === null || value === undefined) continue;
+      const keyLower = String(key).toLowerCase();
+      const looksDateLike = keyLower.includes('date') || keyLower.endsWith('_at') || keyLower.endsWith('at');
+      if (!looksDateLike) continue;
+      const extracted = value instanceof Date
+        ? value.toISOString().split('T')[0]
+        : extractDateFromString(value);
+      if (extracted) return extracted;
+    }
+
+    return '';
+  };
+
+  const buildSchedulePayload = (form) => {
+    const normalizedDate = String(form?.date || '').trim();
+    const startTime = String(form?.start_time || '').trim();
+    const endTime = String(form?.end_time || '').trim();
+    const userId = form?.user_id || '';
+    const roleId = form?.role_id || '';
+
+    const payload = {
+      // Common user keys
+      user_id: userId || undefined,
+      volunteer_id: userId || undefined,
+      userId: userId || undefined,
+
+      // Common role keys
+      role_id: roleId || undefined,
+      volunteer_role_id: roleId || undefined,
+      roleId: roleId || undefined,
+
+      // Common date keys
+      date: normalizedDate || undefined,
+      scheduled_date: normalizedDate || undefined,
+      schedule_date: normalizedDate || undefined,
+      scheduled_for: normalizedDate || undefined,
+
+      // Common time keys
+      start_time: startTime || undefined,
+      end_time: endTime || undefined,
+      starts_at: startTime || undefined,
+      ends_at: endTime || undefined,
+      time: startTime || undefined,
+
+      // Misc
+      location: form?.location?.trim() || undefined,
+    };
+
+    return Object.fromEntries(
+      Object.entries(payload).filter(([, value]) => value !== undefined && value !== null && value !== ''),
+    );
+  };
+
+  const buildAnnouncementPayload = (form) => {
+    const selectedRole = String(form?.role_id || '').trim();
+    const rolesArray = selectedRole ? [selectedRole] : ['all'];
+
+    const payload = {
+      title: form?.title?.trim() || '',
+      message: form?.message?.trim() || '',
+      priority: form?.priority || 'normal',
+
+      // Compatibility keys for different backend implementations.
+      role_id: selectedRole || undefined,
+      target_roles: rolesArray,
+      target_role_ids: selectedRole ? rolesArray : undefined,
+    };
+
+    return Object.fromEntries(
+      Object.entries(payload).filter(([, value]) => value !== undefined && value !== null && value !== ''),
+    );
+  };
+
+  const normalizeSchedule = (raw) => {
+    const sched = raw?.data && typeof raw.data === 'object' ? raw.data : raw;
+    if (!sched || typeof sched !== 'object') return null;
+    const id = sched.id ?? sched.schedule_id;
+    if (id === null || id === undefined) return null;
+
+    const roleId = sched.role_id ?? sched.role?.id ?? sched.volunteer_role_id ?? null;
+    const userData = sched.user || sched.volunteer || null;
+    const userId = sched.user_id ?? userData?.id ?? null;
+    const dateValue = resolveScheduleDate(sched);
+
+    return {
+      ...sched,
+      id,
+      role_id: roleId,
+      user_id: userId,
+      user: userData,
+      date: dateValue,
+      location: sched.location || '',
+    };
+  };
+
   useEffect(() => {
     loadStats();
   }, []);
@@ -64,13 +251,20 @@ export default function AdminTab() {
 
       console.log("Announcements response:", annoRes.data);
 
+      const appsList = toArray(apps.data, ['applications', 'items']);
+      const rolesList = toArray(rolesRes.data, ['roles', 'items']);
+      const schedulesList = toArray(schedRes.data, ['schedules', 'items']);
+      const announcementsList = toArray(annoRes.data, ['announcements', 'items']);
+      const groupsList = toArray(groupsRes.data, ['groups', 'items']);
+      const attendanceList = toArray(attRes.data, ['attendance', 'items']);
+
       setStats({
-        pendingApplications: apps.data?.filter(a => a.status !== 'approved').length || 0,
-        totalRoles: rolesRes.data?.length || 0,
-        scheduledEvents: schedRes.data?.length || 0,
-        announcements: annoRes.data?.length || 0,
-        groups: groupsRes.data?.length || 0,
-        hoursLogged: attRes.data?.reduce((sum, a) => sum + (a.hours_worked || 0), 0) || 0,
+        pendingApplications: appsList.filter((a) => a.status !== 'approved').length || 0,
+        totalRoles: rolesList.length || 0,
+        scheduledEvents: schedulesList.length || 0,
+        announcements: announcementsList.length || 0,
+        groups: groupsList.length || 0,
+        hoursLogged: attendanceList.reduce((sum, a) => sum + (a.hours_worked || 0), 0) || 0,
       });
     } catch (err) {
       console.error('[AdminTab Stats]', err);
@@ -80,6 +274,8 @@ export default function AdminTab() {
   };
 
   const loadSection = async (section) => {
+    setManagementSection(section); // switch instantly for faster perceived navigation
+    setLoadingSection(section);
     try {
       setLoading(true);
       setError('');
@@ -90,20 +286,107 @@ export default function AdminTab() {
       } else if (section === 'roles') {
 
         const res = await adminAPI.getRoles();
-        setRoles(res.data || []);
+        setRoles(toArray(res.data, ['roles', 'items']).map(normalizeRole).filter(Boolean));
       } else if (section === 'schedules') {
-        const [schedRes, rolesRes, usersRes] = await Promise.all([
+        const [schedRes, rolesRes, volunteersRes, usersRes, appsRes] = await Promise.allSettled([
           adminAPI.getSchedules(),
           adminAPI.getRoles(),
+          adminAPI.getVolunteers(),
           adminAPI.getUsers(),
+          adminAPI.getApplications(),
         ]);
-        setSchedules(
-  Array.isArray(schedRes.data)
-    ? schedRes.data
-    : schedRes.data?.schedules || []
-);
-        setRoles(rolesRes.data || []);
-        setUsers(usersRes.data || []);
+
+        const scheduleUnauthorized = schedRes.status === 'rejected' && schedRes.reason?.response?.status === 401;
+        const rolesUnauthorized = rolesRes.status === 'rejected' && rolesRes.reason?.response?.status === 401;
+        const volunteersUnauthorized = volunteersRes.status === 'rejected' && volunteersRes.reason?.response?.status === 401;
+        const usersUnauthorized = usersRes.status === 'rejected' && usersRes.reason?.response?.status === 401;
+
+        if (schedRes.status === 'rejected' && !scheduleUnauthorized) throw schedRes.reason;
+        if (rolesRes.status === 'rejected' && !rolesUnauthorized) throw rolesRes.reason;
+
+        const schedulesPayload = schedRes.status === 'fulfilled' ? schedRes.value.data : [];
+        const schedulesList = toArray(schedulesPayload, ['schedules', 'items']);
+        setSchedules(schedulesList.map(normalizeSchedule).filter(Boolean));
+
+        const rolesPayload = rolesRes.status === 'fulfilled' ? rolesRes.value.data : [];
+        const rolesList = toArray(rolesPayload, ['roles', 'items']);
+        setRoles(rolesList.map(normalizeRole).filter(Boolean));
+        const normalizePeople = (list) =>
+          (Array.isArray(list) ? list : [])
+            .map((u) => {
+              const firstLast = [u?.first_name, u?.last_name].filter(Boolean).join(' ').trim();
+              const id = u?.id ?? u?.user_id ?? u?.volunteer_id;
+              const name = u?.name || u?.full_name || firstLast || u?.username || u?.email;
+              return id ? { ...u, id, name } : null;
+            })
+            .filter((u) => u && u.name);
+
+        const isAdminUser = (u) => {
+          const roleValue = String(u?.role || u?.user_type || u?.type || '').toLowerCase();
+          return u?.is_admin === true || roleValue === 'admin' || roleValue.includes('admin');
+        };
+
+        if (volunteersRes.status === 'fulfilled') {
+          const volunteersPayload = volunteersRes.value.data;
+          const normalizedVolunteers = Array.isArray(volunteersPayload)
+            ? volunteersPayload
+            : volunteersPayload?.volunteers || volunteersPayload?.users || volunteersPayload?.data || [];
+          const volunteers = normalizePeople(normalizedVolunteers).filter((u) => !isAdminUser(u));
+          if (volunteers.length > 0) {
+            setUsers(volunteers);
+          } else if (usersRes.status === 'fulfilled') {
+            const usersPayload = usersRes.value.data;
+            const normalizedUsers = Array.isArray(usersPayload)
+              ? usersPayload
+              : usersPayload?.users || usersPayload?.data || [];
+            const users = normalizePeople(normalizedUsers).filter((u) => !isAdminUser(u));
+            const volunteerUsers = users.filter((u) => {
+              const roleValue = String(u?.role || u?.user_type || u?.type || '').toLowerCase();
+              return u?.is_volunteer === true || roleValue === 'volunteer' || roleValue.includes('volunteer');
+            });
+            setUsers(volunteerUsers.length > 0 ? volunteerUsers : users);
+          } else {
+            setUsers([]);
+          }
+        } else if (usersRes.status === 'fulfilled') {
+          const usersPayload = usersRes.value.data;
+          const normalizedUsers = Array.isArray(usersPayload)
+            ? usersPayload
+            : usersPayload?.users || usersPayload?.data || [];
+
+          // Keep only volunteer accounts for schedule assignment.
+          const users = normalizePeople(normalizedUsers).filter((u) => !isAdminUser(u));
+          const volunteerUsers = users.filter((u) => {
+            const roleValue = String(u?.role || u?.user_type || u?.type || '').toLowerCase();
+            return u?.is_volunteer === true || roleValue === 'volunteer' || roleValue.includes('volunteer');
+          });
+
+          if (volunteerUsers.length > 0) {
+            setUsers(volunteerUsers);
+          } else if (appsRes.status === 'fulfilled') {
+            const approvedUsers = (appsRes.value.data || [])
+              .filter((app) => app?.status === 'approved')
+              .map((app) => app?.user || app?.volunteer || app);
+            const normalizedApproved = normalizePeople(approvedUsers).filter((u) => !isAdminUser(u));
+            const uniqueUsers = Array.from(new Map(normalizedApproved.map((u) => [u.id, u])).values());
+            setUsers(uniqueUsers);
+          } else {
+            setUsers(users);
+          }
+        } else if (appsRes.status === 'fulfilled') {
+          const approvedUsers = (appsRes.value.data || [])
+            .filter((app) => app?.status === 'approved')
+            .map((app) => app?.user || app?.volunteer || app);
+          const normalizedApproved = normalizePeople(approvedUsers).filter((u) => !isAdminUser(u));
+          const uniqueUsers = Array.from(new Map(normalizedApproved.map((u) => [u.id, u])).values());
+          setUsers(uniqueUsers);
+        } else {
+          setUsers([]);
+        }
+
+        if (scheduleUnauthorized || rolesUnauthorized || volunteersUnauthorized || usersUnauthorized) {
+          setError('Some schedule data is restricted for this account.');
+        }
       } else if (section === 'announcements') {
         const [annoRes, rolesRes] = await Promise.all([
           adminAPI.getAnnouncements(),
@@ -115,7 +398,7 @@ export default function AdminTab() {
     ? annoRes.data
     : annoRes.data?.announcements || []
 );
-        setRoles(rolesRes.data || []);
+        setRoles(toArray(rolesRes.data, ['roles', 'items']).map(normalizeRole).filter(Boolean));
       } else if (section === 'groups') {
         const res = await adminAPI.getGroups();
         setGroups(res.data || []);
@@ -124,24 +407,25 @@ export default function AdminTab() {
         setAttendance(res.data || []);
       }
 
-      setManagementSection(section);
     } catch (err) {
       setError('Failed to load ' + section + ': ' + (err.response?.data?.message || err.message));
     } finally {
       setLoading(false);
+      setLoadingSection('');
     }
   };
 
   // HANDLERS
   const handleApproveApp = async (appId) => {
     try {
+      setError('');
       await adminAPI.approveApplication(appId);
       setApplications((prev) =>
         prev.map((app) => (app.id === appId ? { ...app, status: 'approved' } : app))
       );
       loadStats();
     } catch (err) {
-      setError('Error: ' + err.message);
+      setError('Failed to approve application: ' + parseApiError(err, 'Server rejected the approval request.'));
     }
   };
 
@@ -149,24 +433,35 @@ export default function AdminTab() {
     e.preventDefault();
     if (!roleForm.name.trim()) return alert('Role name required');
     try {
-      const res = await adminAPI.createRole(roleForm);
-      setRoles((prev) => [...prev, res.data]);
+      setError('');
+      const payload = {
+        name: roleForm.name.trim(),
+      };
+      if (roleForm.availability_required?.trim()) {
+        payload.availability_required = roleForm.availability_required.trim();
+      }
+      const res = await adminAPI.createRole(payload);
+      const createdRole = normalizeRole(res.data?.data ?? res.data);
+      if (createdRole) {
+        setRoles((prev) => [...prev, createdRole]);
+      }
       setRoleForm({ name: '', availability_required: '' });
       setShowRoleForm(false);
       loadStats();
     } catch (err) {
-      alert('Error: ' + err.message);
+      setError('Failed to add role: ' + parseApiError(err, 'Server error while creating role.'));
     }
   };
 
   const handleDeleteRole = async (id) => {
     if (!window.confirm('Delete?')) return;
     try {
+      setError('');
       await adminAPI.deleteRole(id);
       setRoles((prev) => prev.filter((r) => r.id !== id));
       loadStats();
     } catch (err) {
-      alert('Error: ' + err.message);
+      setError('Failed to delete role: ' + parseApiError(err, 'Server error while deleting role.'));
     }
   };
 
@@ -176,24 +471,31 @@ export default function AdminTab() {
       return alert('Role, date, time required');
     }
     try {
-      const res = await adminAPI.createSchedule(scheduleForm);
-      setSchedules((prev) => [...prev, res.data]);
+      setError('');
+      const payload = buildSchedulePayload(scheduleForm);
+      const res = await adminAPI.createSchedule(payload);
+      const createdSchedule = normalizeSchedule(res.data?.data ?? res.data);
+      if (createdSchedule) {
+        setSchedules((prev) => [...prev, createdSchedule]);
+      }
       setScheduleForm({ user_id: '', role_id: '', date: '', start_time: '', end_time: '', location: '' });
       setShowScheduleForm(false);
       loadStats();
     } catch (err) {
-      alert('Error: ' + err.message);
+      console.error('[Schedule create validation]', err?.response?.data || err);
+      setError('Failed to add schedule: ' + parseApiError(err, 'Server error while creating schedule.'));
     }
   };
 
   const handleDeleteSchedule = async (id) => {
     if (!window.confirm('Delete?')) return;
     try {
+      setError('');
       await adminAPI.deleteSchedule(id);
       setSchedules((prev) => prev.filter((s) => s.id !== id));
       loadStats();
     } catch (err) {
-      alert('Error: ' + err.message);
+      setError('Failed to delete schedule: ' + parseApiError(err, 'Server error while deleting schedule.'));
     }
   };
 
@@ -203,24 +505,28 @@ export default function AdminTab() {
       return alert('Title and message required');
     }
     try {
-      const res = await adminAPI.createAnnouncement(announcementForm);
+      setError('');
+      const payload = buildAnnouncementPayload(announcementForm);
+      const res = await adminAPI.createAnnouncement(payload);
       setAnnouncements((prev) => [res.data, ...prev]);
       setAnnouncementForm({ title: '', message: '', role_id: '', priority: 'normal' });
       setShowAnnouncementForm(false);
       loadStats();
     } catch (err) {
-      alert('Error: ' + err.message);
+      console.error('[Announcement create validation]', err?.response?.data || err);
+      setError('Failed to send announcement: ' + parseApiError(err, 'Server error while creating announcement.'));
     }
   };
 
   const handleDeleteAnnouncement = async (id) => {
     if (!window.confirm('Delete?')) return;
     try {
+      setError('');
       await adminAPI.deleteAnnouncement(id);
       setAnnouncements((prev) => prev.filter((a) => a.id !== id));
       loadStats();
     } catch (err) {
-      alert('Error: ' + err.message);
+      setError('Failed to delete announcement: ' + parseApiError(err, 'Server error while deleting announcement.'));
     }
   };
 
@@ -228,6 +534,7 @@ export default function AdminTab() {
     e.preventDefault();
     if (!attendanceForm.volunteer_id || !attendanceForm.hours) return alert('Fill all fields');
     try {
+      setError('');
       await adminAPI.logAttendance({
         volunteer_id: attendanceForm.volunteer_id,
         date: attendanceForm.date,
@@ -239,7 +546,7 @@ export default function AdminTab() {
       setAttendance(res.data || []);
       loadStats();
     } catch (err) {
-      alert('Error: ' + err.message);
+      setError('Failed to log attendance: ' + parseApiError(err, 'Server error while logging attendance.'));
     }
   };
 
@@ -260,8 +567,15 @@ export default function AdminTab() {
           </div>
         )}
 
+        {loading && (
+          <div className="bg-white rounded-2xl shadow p-8 flex items-center justify-center gap-3 text-gray-700">
+            <span className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-gray-300 border-t-indigo-600" />
+            <span className="font-medium capitalize">Loading {managementSection}...</span>
+          </div>
+        )}
+
         {/* VOLUNTEERS */}
-        {managementSection === 'volunteers' && (
+        {!loading && managementSection === 'volunteers' && (
           <div className="space-y-4">
             <h3 className="text-xl font-bold">👥 Manage Volunteers</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -269,7 +583,7 @@ export default function AdminTab() {
                 <p className="text-gray-500">No applications</p>
               ) : (
                 applications.map((app) => (
-                  <div key={app.id} className="bg-white rounded-lg shadow p-4 hover:shadow-lg transition">
+                  <div key={app.id} className="bg-white rounded-2xl shadow p-4 transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
                     <h4 className="font-semibold text-sm">{app.user?.name}</h4>
                     <p className="text-xs text-gray-600">{app.user?.email}</p>
                     <p className="text-sm mt-2"><strong>Role:</strong> {app.role?.name}</p>
@@ -292,7 +606,7 @@ export default function AdminTab() {
         )}
 
         {/* ROLES */}
-        {managementSection === 'roles' && (
+        {!loading && managementSection === 'roles' && (
           <div className="space-y-4">
             <div className="flex justify-between items-center">
               <h3 className="text-xl font-bold">🎯 Manage Roles</h3>
@@ -330,7 +644,7 @@ export default function AdminTab() {
                 <p className="text-gray-500">No roles</p>
               ) : (
                 roles.map((role) => (
-                  <div key={role.id} className="bg-white rounded-lg shadow p-4 hover:shadow-lg transition">
+                  <div key={role.id} className="bg-white rounded-2xl shadow p-4 transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
                     <h4 className="font-semibold">{role.name}</h4>
                     <p className="text-xs text-gray-600 mt-1">{role.availability_required || 'No availability'}</p>
                     <button
@@ -347,7 +661,7 @@ export default function AdminTab() {
         )}
 
         {/* SCHEDULES */}
-        {managementSection === 'schedules' && (
+        {!loading && managementSection === 'schedules' && (
           <div className="space-y-4">
             <div className="flex justify-between items-center">
               <h3 className="text-xl font-bold">📅 Manage Schedules</h3>
@@ -391,9 +705,9 @@ export default function AdminTab() {
                   {Array.isArray(schedules) &&
               schedules.map((sched) => (
                     <tr key={sched.id} className="border-b hover:bg-gray-50">
-                      <td className="px-4 py-3">{sched.user?.name}</td>
-                      <td className="px-4 py-3">{roles.find((r) => r.id === sched.role_id)?.name || 'N/A'}</td>
-                      <td className="px-4 py-3">{sched.date?.split(' ')[0]}</td>
+                      <td className="px-4 py-3">{sched.user?.name || users.find((u) => String(u.id) === String(sched.user_id))?.name || 'N/A'}</td>
+                      <td className="px-4 py-3">{roles.find((r) => String(r.id) === String(sched.role_id ?? sched.role?.id))?.name || sched.role?.name || 'N/A'}</td>
+                      <td className="px-4 py-3">{sched.date || '-'}</td>
                       <td className="px-4 py-3">{sched.start_time} {sched.end_time && `- ${sched.end_time}`}</td>
                       <td className="px-4 py-3">{sched.location || '-'}</td>
                       <td className="px-4 py-3 text-center">
@@ -408,7 +722,7 @@ export default function AdminTab() {
         )}
 
         {/* ANNOUNCEMENTS */}
-        {managementSection === 'announcements' && (
+        {!loading && managementSection === 'announcements' && (
           <div className="space-y-4">
             <div className="flex justify-between items-center">
               <h3 className="text-xl font-bold">📢 Manage Announcements</h3>
@@ -435,7 +749,7 @@ export default function AdminTab() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {Array.isArray(announcements) &&
                 announcements.map((anno) => (
-                <div key={anno.id} className="bg-white rounded-lg shadow p-4 hover:shadow-lg transition">
+                <div key={anno.id} className="bg-white rounded-2xl shadow p-4 transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
                   <div className="flex justify-between items-start mb-2">
                     <h4 className="font-semibold text-sm flex-1">{anno.title}</h4>
                     <span className={`text-xs px-2 py-1 rounded whitespace-nowrap ml-2 ${anno.priority === 'high' ? 'bg-red-100 text-red-700' : anno.priority === 'low' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'}`}>
@@ -451,12 +765,12 @@ export default function AdminTab() {
         )}
 
         {/* GROUPS */}
-        {managementSection === 'groups' && (
+        {!loading && managementSection === 'groups' && (
           <div className="space-y-4">
             <h3 className="text-xl font-bold">💬 Discussion Groups</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {groups.map((group) => (
-                <div key={group.id} className="bg-white rounded-lg shadow p-4 hover:shadow-lg transition">
+                <div key={group.id} className="bg-white rounded-2xl shadow p-4 transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
                   <h4 className="font-semibold">{group.name}</h4>
                   <p className="text-xs text-gray-600 mt-1">{group.description}</p>
                   <p className="text-xs text-gray-500 mt-3">👥 {group.members_count || 0} members</p>
@@ -467,7 +781,7 @@ export default function AdminTab() {
         )}
 
         {/* ATTENDANCE */}
-        {managementSection === 'attendance' && (
+        {!loading && managementSection === 'attendance' && (
           <div className="space-y-4">
             <div className="flex justify-between items-center">
               <h3 className="text-xl font-bold">📋 Attendance Logs</h3>
@@ -539,84 +853,90 @@ export default function AdminTab() {
         {/* Volunteers Card */}
         <button
           onClick={() => loadSection('volunteers')}
-          className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition text-left border-l-4 border-teal-500"
+          disabled={!!loadingSection}
+          className="bg-white p-5 sm:p-6 rounded-2xl shadow cursor-pointer transition-all duration-300 hover:shadow-xl hover:-translate-y-1 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 text-left border-l-4 border-teal-500"
         >
           <div className="text-4xl mb-3">👥</div>
           <h3 className="font-bold text-lg mb-1">Volunteers</h3>
           <p className="text-sm text-gray-600 mb-3">Manage & approve applications</p>
           <div className="flex items-baseline justify-between">
             <span className="text-3xl font-bold text-teal-600">{stats.pendingApplications}</span>
-            <span className="text-xs text-gray-500">pending</span>
+            <span className="text-xs text-gray-500">{loadingSection === 'volunteers' ? 'loading...' : 'pending'}</span>
           </div>
         </button>
 
         {/* Roles Card */}
         <button
           onClick={() => loadSection('roles')}
-          className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition text-left border-l-4 border-blue-500"
+          disabled={!!loadingSection}
+          className="bg-white p-5 sm:p-6 rounded-2xl shadow cursor-pointer transition-all duration-300 hover:shadow-xl hover:-translate-y-1 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 text-left border-l-4 border-blue-500"
         >
           <div className="text-4xl mb-3">🎯</div>
           <h3 className="font-bold text-lg mb-1">Roles</h3>
           <p className="text-sm text-gray-600 mb-3">Create & manage roles</p>
           <div className="flex items-baseline justify-between">
             <span className="text-3xl font-bold text-blue-600">{stats.totalRoles}</span>
-            <span className="text-xs text-gray-500">total</span>
+            <span className="text-xs text-gray-500">{loadingSection === 'roles' ? 'loading...' : 'total'}</span>
           </div>
         </button>
 
         {/* Schedules Card */}
         <button
           onClick={() => loadSection('schedules')}
-          className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition text-left border-l-4 border-purple-500"
+          disabled={!!loadingSection}
+          className="bg-white p-5 sm:p-6 rounded-2xl shadow cursor-pointer transition-all duration-300 hover:shadow-xl hover:-translate-y-1 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 text-left border-l-4 border-purple-500"
         >
           <div className="text-4xl mb-3">📅</div>
           <h3 className="font-bold text-lg mb-1">Schedules</h3>
           <p className="text-sm text-gray-600 mb-3">Plan volunteer shifts</p>
           <div className="flex items-baseline justify-between">
             <span className="text-3xl font-bold text-purple-600">{stats.scheduledEvents}</span>
-            <span className="text-xs text-gray-500">scheduled</span>
+            <span className="text-xs text-gray-500">{loadingSection === 'schedules' ? 'loading...' : 'scheduled'}</span>
           </div>
         </button>
 
         {/* Announcements Card */}
         <button
           onClick={() => loadSection('announcements')}
-          className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition text-left border-l-4 border-pink-500"
+          disabled={!!loadingSection}
+          className="bg-white p-5 sm:p-6 rounded-2xl shadow cursor-pointer transition-all duration-300 hover:shadow-xl hover:-translate-y-1 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 text-left border-l-4 border-pink-500"
         >
           <div className="text-4xl mb-3">📢</div>
           <h3 className="font-bold text-lg mb-1">Announcements</h3>
           <p className="text-sm text-gray-600 mb-3">Send messages to volunteers</p>
           <div className="flex items-baseline justify-between">
             <span className="text-3xl font-bold text-pink-600">{stats.announcements}</span>
-            <span className="text-xs text-gray-500">total</span>
+            <span className="text-xs text-gray-500">{loadingSection === 'announcements' ? 'loading...' : 'total'}</span>
           </div>
         </button>
 
         {/* Groups Card */}
         <button
           onClick={() => loadSection('groups')}
-          className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition text-left border-l-4 border-indigo-500"
+          disabled={!!loadingSection}
+          className="bg-white p-5 sm:p-6 rounded-2xl shadow cursor-pointer transition-all duration-300 hover:shadow-xl hover:-translate-y-1 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 text-left border-l-4 border-indigo-500"
         >
           <div className="text-4xl mb-3">💬</div>
           <h3 className="font-bold text-lg mb-1">Groups</h3>
           <p className="text-sm text-gray-600 mb-3">Discussion & communities</p>
           <div className="flex items-baseline justify-between">
             <span className="text-3xl font-bold text-indigo-600">{stats.groups}</span>
-            <span className="text-xs text-gray-500">groups</span>
+            <span className="text-xs text-gray-500">{loadingSection === 'groups' ? 'loading...' : 'groups'}</span>
           </div>
         </button>
 
         {/* Attendance Card */}
         <button
           onClick={() => loadSection('attendance')}
-          className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition text-left border-l-4 border-green-500"
+          disabled={!!loadingSection}
+          className="bg-white p-5 sm:p-6 rounded-2xl shadow cursor-pointer transition-all duration-300 hover:shadow-xl hover:-translate-y-1 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 text-left border-l-4 border-green-500"
         >
           <div className="text-4xl mb-3">📋</div>
           <h3 className="font-bold text-lg mb-1">Attendance</h3>
           <p className="text-sm text-gray-600 mb-3">Track volunteer hours</p>
           <div className="flex items-baseline justify-between">
             <span className="text-3xl font-bold text-green-600">{stats.hoursLogged.toFixed(1)}</span>
-            <span className="text-xs text-gray-500">hours</span>
+            <span className="text-xs text-gray-500">{loadingSection === 'attendance' ? 'loading...' : 'hours'}</span>
           </div>
         </button>
       </div>

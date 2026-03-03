@@ -28,7 +28,7 @@ export default function VolunteerSignup({ roles }) {
 
           {roles.map((role, i) => (
             <option key={i} value={role.id || role.name}>
-              {role.name} — {role.availability}
+              {role.name}
             </option>
           ))}
         </select>
@@ -40,3 +40,4 @@ export default function VolunteerSignup({ roles }) {
     </div>
   );
 }
+

@@ -25,10 +25,14 @@ export const deleteRole = (id) => adminApi.delete(`/admin/roles/${id}`);
 
 // =============== VOLUNTEER APPLICATIONS ===============
 export const getApplications = () => adminApi.get('/admin/applications');
-export const approveApplication = (id) => adminApi.put(`/admin/applications/${id}/approve`);
+export const approveApplication = (id) =>
+  adminApi.put(`/admin/applications/${id}/approve`, {
+    status: 'approved',
+  });
 
 // =============== SCHEDULES ===============
 export const getSchedules = () => adminApi.get('/admin/schedules');
+export const getVolunteers = () => adminApi.get('/admin/volunteers');
 export const getUsers = () => adminApi.get('/admin/users');
 export const createSchedule = (data) => adminApi.post('/admin/schedules', data);
 export const updateSchedule = (id, data) => adminApi.put(`/admin/schedules/${id}`, data);

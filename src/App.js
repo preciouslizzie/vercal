@@ -64,7 +64,7 @@ const AdminLayout = () => {
 
         <div className="p-4">
           <Routes>
-            <Route index element={<Sermons />} />
+            <Route index element={<Dashboard />} />
             <Route path="sermons" element={<Sermons />} />
             <Route path="donations" element={<Donations />} />
             <Route path="volunteer" element={<VolunteerDashboard />} />

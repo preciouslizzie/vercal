@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import API from '../../api/api';
 
 export default function AdminRoleForm({ roles, onAdd }) {
-  const [form, setForm] = useState({ name: '', availability: '' });
+  const [form, setForm] = useState({ name: '', availability_required: '' });
   const [remoteRoles, setRemoteRoles] = useState(roles || []);
 
   useEffect(() => {
@@ -10,14 +10,14 @@ export default function AdminRoleForm({ roles, onAdd }) {
   }, []);
 
   const submit = () => {
-    if (!form.name || !form.availability) return;
+    if (!form.name || !form.availability_required) return;
 
     API.createVolunteerRole(form)
       .then((res) => {
         const created = res.data;
         onAdd((prev) => [...prev, created]);
         setRemoteRoles((r) => [...r, created]);
-        setForm({ name: '', availability: '' });
+        setForm({ name: '', availability_required: '' });
       })
       .catch(() => alert('Failed to create role'));
   };
@@ -39,8 +39,8 @@ export default function AdminRoleForm({ roles, onAdd }) {
         <input
           placeholder="Availability (e.g Sundays 7am – 10am)"
           className="rounded-lg border px-4 py-2 text-sm flex-1"
-          value={form.availability}
-          onChange={(e) => setForm({ ...form, availability: e.target.value })}
+          value={form.availability_required}
+          onChange={(e) => setForm({ ...form, availability_required: e.target.value })}
         />
 
         <button
@@ -60,7 +60,7 @@ export default function AdminRoleForm({ roles, onAdd }) {
               className="flex justify-between rounded-md bg-gray-50 px-4 py-2"
             >
               <span className="font-medium">{r.name}</span>
-              <span className="text-gray-500">{r.availability}</span>
+              <span className="text-gray-500">{r.availability_required}</span>
             </div>
           ))}
         </div>
