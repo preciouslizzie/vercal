@@ -1,29 +1,128 @@
 import React, { useEffect, useState } from 'react';
 import API from '../api/api';
 
+const toArray = (payload, nestedKeys = []) => {
+  if (Array.isArray(payload)) return payload;
+  if (!payload || typeof payload !== 'object') return [];
+  if (Array.isArray(payload.data)) return payload.data;
+
+  for (const key of nestedKeys) {
+    const value = payload[key];
+    if (Array.isArray(value)) return value;
+    if (value && typeof value === 'object' && Array.isArray(value.data)) return value.data;
+  }
+
+  return [];
+};
+
+const looksLikeMember = (value) => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const keys = Object.keys(value).map((k) => k.toLowerCase());
+  const markerCount = [
+    'member_id', 'user_id', 'name', 'full_name', 'first_name', 'last_name',
+    'email', 'mail', 'role', 'user_role', 'position', 'department',
+  ].reduce((sum, key) => (keys.includes(key) ? sum + 1 : sum), 0);
+  return markerCount >= 2;
+};
+
+const findMembersDeep = (payload, depth = 0) => {
+  if (depth > 6 || payload === null || payload === undefined) return [];
+  if (Array.isArray(payload)) {
+    if (payload.some((item) => looksLikeMember(item))) return payload;
+    for (const item of payload) {
+      const found = findMembersDeep(item, depth + 1);
+      if (found.length > 0) return found;
+    }
+    return [];
+  }
+  if (typeof payload !== 'object') return [];
+  for (const value of Object.values(payload)) {
+    const found = findMembersDeep(value, depth + 1);
+    if (found.length > 0) return found;
+  }
+  return [];
+};
+
+const normalizeMember = (raw) => {
+  if (!raw || typeof raw !== 'object') return null;
+  const id = raw.id ?? raw.member_id ?? raw.user_id;
+  const fullName = [raw.first_name, raw.last_name].filter(Boolean).join(' ').trim();
+  const name = raw.name || raw.full_name || fullName || raw.username || '';
+  const email = raw.email || raw.mail || '';
+  const role = raw.role || raw.user_role || raw.type || 'member';
+
+  if (!id && !name && !email) return null;
+  return {
+    ...raw,
+    id: id ?? `${email}-${name}`,
+    name: name || '-',
+    email: email || '-',
+    role,
+  };
+};
+
+const isAdminLike = (member) => {
+  const roleValue = String(member?.role || member?.user_role || member?.type || '').toLowerCase();
+  const normalized = roleValue.replace(/[_\s-]/g, '');
+  return (
+    member?.is_admin === true
+    || normalized === 'admin'
+    || normalized === 'superadmin'
+    || roleValue.includes('admin')
+  );
+};
+
+const extractMembers = (payload) => {
+  const list = toArray(payload, ['members', 'items', 'users']);
+  const deep = list.length > 0 ? list : findMembersDeep(payload);
+  const source = deep.length > 0 ? deep : list;
+  return source.map(normalizeMember).filter(Boolean).filter((member) => !isAdminLike(member));
+};
+
+const readRecentMembersCache = () => {
+  try {
+    const cached = JSON.parse(localStorage.getItem('recent_members') || '[]');
+    return Array.isArray(cached) ? cached.map(normalizeMember).filter(Boolean) : [];
+  } catch {
+    return [];
+  }
+};
+
+const mergeMembers = (apiMembers, cachedMembers) => {
+  const merged = [...apiMembers, ...cachedMembers];
+  return Array.from(
+    new Map(
+      merged
+        .filter(Boolean)
+        .filter((member) => !isAdminLike(member))
+        .map((m) => [String(m.id || `${m.email}-${m.name}`), m]),
+    ).values(),
+  );
+};
+
 const Members = () => {
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({ name: '', email: '', role: 'member' });
 
-  const [form, setForm] = useState({
-    name: '',
-    email: '',
-    role: 'member',
-    position: 'None',
-  });
-
-  const [editingId, setEditingId] = useState(null);
-
-  // Load Members
   const loadMembers = async () => {
     try {
-      const res = await API.get('/members');
-      setMembers(res.data);
+      setLoading(true);
+      const [membersRes, usersRes] = await Promise.all([
+        API.getMembers().catch(() => ({ data: [] })),
+        API.get('/admin/users').catch(() => ({ data: [] })),
+      ]);
+      const membersFromMembersEndpoint = extractMembers(membersRes?.data);
+      const membersFromUsersEndpoint = extractMembers(usersRes?.data);
+      const apiMembers = mergeMembers(membersFromMembersEndpoint, membersFromUsersEndpoint);
+      const cachedMembers = readRecentMembersCache();
+      setMembers(mergeMembers(apiMembers, cachedMembers));
     } catch (err) {
       console.error('Failed to load members:', err);
-      const message = err.response?.data?.message || err.message || 'Failed to load members';
-      alert(`Error loading members: ${message}`);
-      setMembers([]);
+      setMembers(readRecentMembersCache());
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -31,185 +130,148 @@ const Members = () => {
     loadMembers();
   }, []);
 
-  // Create or Update Member
-  const handleSubmit = async () => {
-    if (!form.name || !form.email) {
+  const isAdminUser = (() => {
+    try {
+      const admin = JSON.parse(localStorage.getItem('admin_user') || '{}');
+      const role = String(admin?.role || admin?.user_role || admin?.type || '').toLowerCase().replace(/[_\s-]/g, '');
+      return admin?.is_admin === true || role === 'admin' || role === 'superadmin';
+    } catch {
+      return false;
+    }
+  })();
+
+  const handleAddMember = async (e) => {
+    e.preventDefault();
+    if (!form.name.trim() || !form.email.trim()) {
       alert('Name and email required');
       return;
     }
 
-    setLoading(true);
-
     try {
-      const payload = { ...form };
-
-      if (editingId) {
-        await API.put(`/members/${editingId}`, payload);
-      } else {
-        await API.post('/members', payload);
+      setSaving(true);
+      const payload = {
+        name: form.name.trim(),
+        email: form.email.trim(),
+        role: form.role || 'member',
+      };
+      let createRes;
+      try {
+        createRes = await API.post('/admin/users', payload);
+      } catch (usersErr) {
+        try {
+          createRes = await API.createMember(payload);
+        } catch (membersErr) {
+          const usersMessage = usersErr?.response?.data?.message || usersErr?.message || 'Unknown /admin/users error';
+          const membersMessage = membersErr?.response?.data?.message || membersErr?.message || 'Unknown /members error';
+          throw new Error(`/admin/users failed: ${usersMessage}; /members failed: ${membersMessage}`);
+        }
       }
-
-      setForm({
-        name: '',
-        email: '',
-        role: 'member',
-        position: 'None',
-      });
-
-      setEditingId(null);
+      const created = normalizeMember(
+        createRes?.data?.data
+        ?? createRes?.data
+        ?? { ...payload, id: `${Date.now()}-${payload.email}` },
+      );
+      if (created && !isAdminLike(created)) {
+        let next = [];
+        setMembers((prev) => {
+          next = mergeMembers([created, ...prev], []);
+          return next;
+        });
+        try {
+          localStorage.setItem('recent_members', JSON.stringify(next.slice(0, 100)));
+        } catch {
+          // ignore storage issues
+        }
+      }
+      setForm({ name: '', email: '', role: 'member' });
+      window.dispatchEvent(new Event('members:updated'));
       await loadMembers();
-    } catch (e) {
-      console.error(e);
-      alert('Operation failed');
+    } catch (err) {
+      alert(err?.response?.data?.message || err?.message || 'Failed to add member');
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
-  // Delete Member
-  const handleDelete = async (id) => {
-    if (!window.confirm('Delete this member?')) return;
-    await API.delete(`/members/${id}`);
-    loadMembers();
-  };
-
-  // Start Edit
-  const startEdit = (m) => {
-    setEditingId(m.id);
-    setForm({
-      name: m.name,
-      email: m.email,
-      role: m.role || 'member',
-      position: m.position || 'None',
-    });
-  };
-
   return (
-    <div className="max-w-6xl mx-auto p-6 bg-gray-50 rounded-2xl shadow-xl">
-      <h2 className="text-3xl font-bold text-gray-800 mb-8">Church Members</h2>
+    <div className="max-w-6xl mx-auto p-6 bg-gray-50 rounded-2xl shadow-xl space-y-6">
+      <div>
+        <h2 className="text-3xl font-bold text-gray-800">Church Members</h2>
+        <p className="text-gray-600 mt-2">
+          Member records managed by Admin Panel are displayed here.
+        </p>
+      </div>
 
-      {/* Form */}
-      <div className="bg-white p-6 rounded-xl shadow mb-10">
-        <h3 className="text-lg font-semibold mb-4 text-gray-700">
-          {editingId ? 'Update Member' : 'Add Member'}
-        </h3>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {isAdminUser && (
+        <form onSubmit={handleAddMember} className="bg-white rounded-xl shadow p-4 grid grid-cols-1 md:grid-cols-4 gap-3">
           <input
-            className="border rounded-lg p-3 focus:ring-2 focus:ring-indigo-500 outline-none"
+            type="text"
             placeholder="Full Name"
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
+            className="border rounded px-3 py-2"
+            required
           />
-
           <input
-            className="border rounded-lg p-3 focus:ring-2 focus:ring-indigo-500 outline-none"
+            type="email"
             placeholder="Email"
             value={form.email}
             onChange={(e) => setForm({ ...form, email: e.target.value })}
+            className="border rounded px-3 py-2"
+            required
           />
-
           <select
-            className="border rounded-lg p-3 focus:ring-2 focus:ring-indigo-500 outline-none"
             value={form.role}
             onChange={(e) => setForm({ ...form, role: e.target.value })}
+            className="border rounded px-3 py-2"
           >
             <option value="member">Member</option>
+            <option value="user">User</option>
+            <option value="volunteer">Volunteer</option>
             <option value="worker">Worker</option>
-            <option value="admin">Admin</option>
+            <option value="leader">Leader</option>
           </select>
-
-          <select
-            className="border rounded-lg p-3 focus:ring-2 focus:ring-indigo-500 outline-none"
-            value={form.position}
-            onChange={(e) => setForm({ ...form, position: e.target.value })}
-          >
-            <option value="None">None</option>
-            <option value="Pastor">Pastor</option>
-            <option value="Usher">Usher</option>
-            <option value="Choir">Choir</option>
-            <option value="Media">Media</option>
-            <option value="Protocol">Protocol</option>
-            <option value="Children Ministry">Children Ministry</option>
-          </select>
-        </div>
-
-        <div className="mt-6 text-right">
           <button
-            onClick={handleSubmit}
-            disabled={loading}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-lg shadow transition"
+            type="submit"
+            disabled={saving}
+            className="bg-blue-600 text-white rounded px-4 py-2 font-medium hover:bg-blue-700 disabled:opacity-60"
           >
-            {loading
-              ? 'Saving...'
-              : editingId
-                ? 'Update Member'
-                : 'Add Member'}
+            {saving ? 'Adding...' : 'Add Member'}
           </button>
-        </div>
-      </div>
+        </form>
+      )}
 
-      {/* Members Table */}
-      <div className="bg-white rounded-xl shadow overflow-hidden">
-        <table className="w-full text-left">
-          <thead className="bg-gray-100 text-gray-600">
-            <tr>
-              <th className="p-4">Name</th>
-              <th className="p-4">Email</th>
-              <th className="p-4">Role</th>
-              <th className="p-4">Position</th>
-              <th className="p-4 text-right">Actions</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {members.map((m) => (
-              <tr key={m.id} className="border-t hover:bg-gray-50 transition">
-                <td className="p-4 font-medium">{m.name}</td>
-                <td className="p-4 text-gray-600">{m.email}</td>
-                <td className="p-4">
-                  <span className="px-3 py-1 rounded-full text-sm bg-indigo-100 text-indigo-700">
-                    {m.role}
-                  </span>
-                </td>
-                <td className="p-4">
-                  {m.position !== 'None' ? (
-                    <span className="px-3 py-1 rounded-full text-sm bg-emerald-100 text-emerald-700">
-                      {m.position}
-                    </span>
-                  ) : (
-                    <span className="text-gray-400">—</span>
-                  )}
-                </td>
-                <td className="p-4 text-right space-x-3">
-                  <button
-                    onClick={() => startEdit(m)}
-                    className="text-indigo-600 hover:underline"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => handleDelete(m.id)}
-                    className="text-red-600 hover:underline"
-                  >
-                    Delete
-                  </button>
-                </td>
-              </tr>
-            ))}
-
-            {members.length === 0 && (
+      {loading ? (
+        <div className="bg-white rounded-xl shadow p-8 text-center text-gray-600">Loading members...</div>
+      ) : (
+        <div className="overflow-x-auto bg-white rounded-lg shadow">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-100 border-b">
               <tr>
-                <td colSpan="5" className="p-8 text-center text-gray-400">
-                  No members yet
-                </td>
+                <th className="px-4 py-3 text-left">Name</th>
+                <th className="px-4 py-3 text-left">Email</th>
+                <th className="px-4 py-3 text-left">Role</th>
               </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {members.length === 0 ? (
+                <tr>
+                  <td className="px-4 py-4 text-gray-500" colSpan="3">No members found.</td>
+                </tr>
+              ) : members.map((m) => (
+                <tr key={m.id || `${m.email}-${m.name}`} className="border-b hover:bg-gray-50">
+                  <td className="px-4 py-3">{m.name || '-'}</td>
+                  <td className="px-4 py-3">{m.email || '-'}</td>
+                  <td className="px-4 py-3">{m.role || 'member'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 };
 
 export default Members;
+

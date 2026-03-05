@@ -1,12 +1,21 @@
 import axios from 'axios';
 
+const BASE_URL = process.env.REACT_APP_API_URL || 'https://lizzy.altoservices.org/api';
+
 const API = axios.create({
-  baseURL: 'https://lizzy.altoservices.org/api',
+  baseURL: BASE_URL,
 });
+
+const getStoredToken = () => (
+  localStorage.getItem('admin_token')
+  || localStorage.getItem('token')
+  || localStorage.getItem('user_token')
+  || ''
+);
 
 API.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('admin_token');
+    const token = getStoredToken();
 
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -16,23 +25,19 @@ API.interceptors.request.use(
   },
   (error) => Promise.reject(error),
 );
+
 export const adminLogin = (data) => API.post('/admin/login', data);
 export const getUsers = () => API.get('/admin/users');
+
 /* EVENTS */
-let baseURL;
-export const getEvents = () => axios.get(`${baseURL}/events/get.php`);
-
-export const createEvent = (data) => axios.post(`${baseURL}/events/create.php`, data);
-
-export const deleteEvent = (id) => axios.delete(`${baseURL}/events/delete.php?id=${id}`);
+export const getEvents = () => API.get('/events/get.php');
+export const createEvent = (data) => API.post('/events/create.php', data);
+export const deleteEvent = (id) => API.delete(`/events/delete.php?id=${id}`);
 
 /* VOLUNTEER */
-let API_URL;
-export const getAnnouncements = () => axios.get(`${API_URL}/volunteer/announcements`);
-
-export const getSchedules = () => axios.get(`${API_URL}/volunteer/schedule/get.php`);
-
-export const getDiscussions = () => axios.get(`${API_URL}/volunteer/discussion/get.php`);
+export const getAnnouncements = () => API.get('/volunteer/announcements');
+export const getSchedules = () => API.get('/volunteer/schedule/get.php');
+export const getDiscussions = () => API.get('/volunteer/discussion/get.php');
 
 API.interceptors.response.use(
   (response) => response,
@@ -40,6 +45,9 @@ API.interceptors.response.use(
     if (error.response?.status === 401) {
       localStorage.removeItem('admin_token');
       localStorage.removeItem('admin_user');
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      localStorage.removeItem('user_token');
       window.location.href = '/login';
     }
     return Promise.reject(error);
@@ -63,7 +71,7 @@ API.applyForVolunteerRole = (roleId) => API.post(`/volunteer/apply/${roleId}`);
 
 API.getMySchedule = () => API.get('/my-schedule');
 
-API.getMyAnnouncements = () => API.get('/announcements');
+API.getMyAnnouncements = () => API.get('/volunteer/announcements');
 
 API.createAnnouncement = (data) => API.post('/announcements', data); // admin
 
@@ -106,5 +114,7 @@ API.updateBlog = (id, data) => API.put(`/blog/${id}`, data, {
 });
 
 API.deleteBlog = (id) => API.delete(`/blog/${id}`);
+
+API.getWhatsAppLinks = () => API.get('/whatsapp-links');
 
 export default API;

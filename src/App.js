@@ -18,6 +18,7 @@ import Members from './pages/Members';
 import Events from './pages/Events';
 import Dashboard from './pages/Dashboard';
 import Blogs from './pages/Blogs';
+import WhatsAppGroups from './pages/WhatsAppGroups';
 import VolunteerDashboard from './pages/Volunteer/VolunteerDashboard';
 
 import AdminProtectedRoute from './components/AdminProtectedRoute';
@@ -68,10 +69,12 @@ const AdminLayout = () => {
             <Route path="sermons" element={<Sermons />} />
             <Route path="donations" element={<Donations />} />
             <Route path="volunteer" element={<VolunteerDashboard />} />
+            <Route path="volunteer/:tab" element={<VolunteerDashboard />} />
             <Route path="members" element={<Members />} />
             <Route path="adminLogin" element={<AdminLogin />} />
             <Route path="dashboard" element={<Dashboard />} />
             <Route path="blogs" element={<Blogs />} />
+            <Route path="whatsapp" element={<WhatsAppGroups />} />
             <Route path="kanban" element={<Kanban />} />
             <Route path="events" element={<Events />} />
             <Route path="color-picker" element={<ColorPicker />} />

@@ -64,4 +64,8 @@ export const getVolunteerAttendance = (userId) => adminApi.get(`/admin/volunteer
 export const getAvailabilityReport = () => adminApi.get('/admin/volunteers/availability-report');
 export const getHoursSummary = () => adminApi.get('/admin/hours-summary');
 
+// =============== WHATSAPP LINKS ===============
+export const createWhatsAppLink = (data) => adminApi.post('/admin/whatsapp-links', data);
+export const getWhatsAppLinks = () => adminApi.get('/whatsapp-links');
+
 export default adminApi;

@@ -8,6 +8,70 @@ import {
 } from 'react-icons/fa';
 import API from '../api/api';
 
+const toArray = (payload, nestedKeys = []) => {
+  if (Array.isArray(payload)) return payload;
+  if (!payload || typeof payload !== 'object') return [];
+  if (Array.isArray(payload.data)) return payload.data;
+
+  for (const key of nestedKeys) {
+    const value = payload[key];
+    if (Array.isArray(value)) return value;
+    if (value && typeof value === 'object' && Array.isArray(value.data)) return value.data;
+  }
+
+  return [];
+};
+
+const isAdminLike = (item) => {
+  const roleValue = String(item?.role || item?.user_role || item?.type || '').toLowerCase();
+  const normalized = roleValue.replace(/[_\s-]/g, '');
+  return item?.is_admin === true || normalized === 'admin' || normalized === 'superadmin' || roleValue.includes('admin');
+};
+
+const normalizeMember = (raw) => {
+  if (!raw || typeof raw !== 'object') return null;
+  const id = raw.id ?? raw.member_id ?? raw.user_id;
+  const fullName = [raw.first_name, raw.last_name].filter(Boolean).join(' ').trim();
+  const name = raw.name || raw.full_name || fullName || raw.username || '';
+  const email = raw.email || raw.mail || '';
+  const role = raw.role || raw.user_role || raw.type || 'member';
+
+  if (!id && !name && !email) return null;
+  return {
+    ...raw,
+    id: id ?? `${email}-${name}`,
+    name: name || '-',
+    email: email || '-',
+    role,
+  };
+};
+
+const extractMembers = (payload) => (
+  toArray(payload, ['members', 'items', 'users'])
+    .map(normalizeMember)
+    .filter(Boolean)
+    .filter((m) => !isAdminLike(m))
+);
+
+const readRecentMembersCache = () => {
+  try {
+    const cached = JSON.parse(localStorage.getItem('recent_members') || '[]');
+    return Array.isArray(cached)
+      ? cached.map(normalizeMember).filter(Boolean).filter((m) => !isAdminLike(m))
+      : [];
+  } catch {
+    return [];
+  }
+};
+
+const mergeMembers = (apiMembers, cachedMembers) => Array.from(
+  new Map(
+    [...apiMembers, ...cachedMembers]
+      .filter(Boolean)
+      .map((m) => [String(m.id || `${m.email}-${m.name}`), m]),
+  ).values(),
+);
+
 const StatCard = ({ title, value, icon, color, onClick }) => (
   <div
     onClick={onClick} // use the passed prop
@@ -72,20 +136,28 @@ const Dashboard = () => {
   const loadStats = async () => {
     setLoading(true);
     try {
-      const [members, events, sermons, donations, volunteer] = await Promise.all([
+      const [members, users, events, sermons, donations, volunteer] = await Promise.all([
         API.get('/members').catch(() => ({ data: [] })),
+        API.get('/admin/users').catch(() => ({ data: [] })),
         API.get('/events').catch(() => ({ data: [] })),
         API.get('/audio').catch(() => ({ data: [] })),
         API.get('/pay').catch(() => ({ data: [] })),
         API.get('/volunteer').catch(() => ({ data: [] })),
       ]);
 
+      let membersList = mergeMembers(extractMembers(members.data), extractMembers(users.data));
+      membersList = mergeMembers(membersList, readRecentMembersCache());
+      const eventsList = toArray(events.data, ['events', 'items']);
+      const sermonsList = toArray(sermons.data, ['audio', 'audios', 'sermons', 'items']);
+      const donationsList = toArray(donations.data, ['donations', 'payments', 'items']);
+      const volunteersList = toArray(volunteer.data, ['volunteers', 'users', 'items']);
+
       setStats({
-        members: members.data.length,
-        events: events.data.length,
-        sermons: sermons.data.length,
-        donations: donations.data.length,
-        volunteer: volunteer.data.length,
+        members: membersList.length,
+        events: eventsList.length,
+        sermons: sermonsList.length,
+        donations: donationsList.length,
+        volunteer: volunteersList.length,
       });
     } finally {
       setLoading(false);
@@ -94,6 +166,18 @@ const Dashboard = () => {
 
   useEffect(() => {
     loadStats();
+
+    const handleMembersUpdated = () => {
+      loadStats();
+    };
+
+    window.addEventListener('members:updated', handleMembersUpdated);
+    window.addEventListener('focus', handleMembersUpdated);
+
+    return () => {
+      window.removeEventListener('members:updated', handleMembersUpdated);
+      window.removeEventListener('focus', handleMembersUpdated);
+    };
   }, []);
 
   return (

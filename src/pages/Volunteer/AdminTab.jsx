@@ -38,6 +38,13 @@ export default function AdminTab() {
 
   // Groups State
   const [groups, setGroups] = useState([]);
+  const [showGroupForm, setShowGroupForm] = useState(false);
+  const [groupForm, setGroupForm] = useState({
+    name: '',
+    department: '',
+    description: '',
+    whatsapp_link: '',
+  });
 
   // Attendance State
   const [attendance, setAttendance] = useState([]);
@@ -193,7 +200,13 @@ export default function AdminTab() {
 
   const buildAnnouncementPayload = (form) => {
     const selectedRole = String(form?.role_id || '').trim();
-    const rolesArray = selectedRole ? [selectedRole] : ['all'];
+    const selectedRoleId = selectedRole ? Number(selectedRole) : null;
+    const roleIds = selectedRole
+      ? [Number.isNaN(selectedRoleId) ? selectedRole : selectedRoleId]
+      : [];
+    const targetRolesText = roleIds.length > 0
+      ? roleIds.map(String).join(',')
+      : 'all';
 
     const payload = {
       title: form?.title?.trim() || '',
@@ -202,8 +215,12 @@ export default function AdminTab() {
 
       // Compatibility keys for different backend implementations.
       role_id: selectedRole || undefined,
-      target_roles: rolesArray,
-      target_role_ids: selectedRole ? rolesArray : undefined,
+      role_ids: roleIds.length > 0 ? roleIds : undefined,
+      target_roles: targetRolesText,
+      target_roles_list: roleIds.length > 0 ? roleIds : ['all'],
+      target_role_ids: roleIds.length > 0 ? roleIds : undefined,
+      send_to_all: roleIds.length === 0,
+      all_roles: roleIds.length === 0,
     };
 
     return Object.fromEntries(
@@ -440,11 +457,7 @@ export default function AdminTab() {
       if (roleForm.availability_required?.trim()) {
         payload.availability_required = roleForm.availability_required.trim();
       }
-      const res = await adminAPI.createRole(payload);
-      const createdRole = normalizeRole(res.data?.data ?? res.data);
-      if (createdRole) {
-        setRoles((prev) => [...prev, createdRole]);
-      }
+      await adminAPI.createRole(payload);
       setRoleForm({ name: '', availability_required: '' });
       setShowRoleForm(false);
       loadStats();
@@ -473,11 +486,7 @@ export default function AdminTab() {
     try {
       setError('');
       const payload = buildSchedulePayload(scheduleForm);
-      const res = await adminAPI.createSchedule(payload);
-      const createdSchedule = normalizeSchedule(res.data?.data ?? res.data);
-      if (createdSchedule) {
-        setSchedules((prev) => [...prev, createdSchedule]);
-      }
+      await adminAPI.createSchedule(payload);
       setScheduleForm({ user_id: '', role_id: '', date: '', start_time: '', end_time: '', location: '' });
       setShowScheduleForm(false);
       loadStats();
@@ -527,6 +536,33 @@ export default function AdminTab() {
       loadStats();
     } catch (err) {
       setError('Failed to delete announcement: ' + parseApiError(err, 'Server error while deleting announcement.'));
+    }
+  };
+
+  const handleAddGroup = async (e) => {
+    e.preventDefault();
+    if (!groupForm.name.trim()) return alert('Group name required');
+    if (!groupForm.whatsapp_link.trim()) return alert('WhatsApp group link required');
+
+    try {
+      setError('');
+      const payload = {
+        name: groupForm.name.trim(),
+        department: groupForm.department.trim() || undefined,
+        description: groupForm.description.trim() || undefined,
+        whatsapp_link: groupForm.whatsapp_link.trim(),
+        whatsapp_url: groupForm.whatsapp_link.trim(),
+        invite_link: groupForm.whatsapp_link.trim(),
+        link: groupForm.whatsapp_link.trim(),
+      };
+      const res = await adminAPI.createGroup(payload);
+      const created = res?.data?.data ?? res?.data;
+      setGroups((prev) => [created, ...prev].filter(Boolean));
+      setGroupForm({ name: '', department: '', description: '', whatsapp_link: '' });
+      setShowGroupForm(false);
+      loadStats();
+    } catch (err) {
+      setError('Failed to create group: ' + parseApiError(err, 'Server error while creating group.'));
     }
   };
 
@@ -764,16 +800,73 @@ export default function AdminTab() {
           </div>
         )}
 
-        {/* GROUPS */}
+                {/* GROUPS */}
         {!loading && managementSection === 'groups' && (
           <div className="space-y-4">
-            <h3 className="text-xl font-bold">💬 Discussion Groups</h3>
+            <div className="flex justify-between items-center">
+              <h3 className="text-xl font-bold">Discussion Groups</h3>
+              <button
+                onClick={() => setShowGroupForm(!showGroupForm)}
+                className="bg-blue-500 text-white px-4 py-2 rounded text-sm font-medium hover:bg-blue-600"
+              >
+                {showGroupForm ? 'Cancel' : '+ New Group'}
+              </button>
+            </div>
+
+            {showGroupForm && (
+              <form onSubmit={handleAddGroup} className="bg-gray-50 rounded-lg p-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+                <input
+                  type="text"
+                  placeholder="Department / Group name"
+                  value={groupForm.name}
+                  onChange={(e) => setGroupForm({ ...groupForm, name: e.target.value })}
+                  className="w-full border rounded px-3 py-2"
+                  required
+                />
+                <input
+                  type="text"
+                  placeholder="Department (optional)"
+                  value={groupForm.department}
+                  onChange={(e) => setGroupForm({ ...groupForm, department: e.target.value })}
+                  className="w-full border rounded px-3 py-2"
+                />
+                <textarea
+                  placeholder="Group description"
+                  value={groupForm.description}
+                  onChange={(e) => setGroupForm({ ...groupForm, description: e.target.value })}
+                  className="w-full border rounded px-3 py-2 md:col-span-2"
+                  rows="3"
+                />
+                <input
+                  type="url"
+                  placeholder="WhatsApp invite link (https://chat.whatsapp.com/...)"
+                  value={groupForm.whatsapp_link}
+                  onChange={(e) => setGroupForm({ ...groupForm, whatsapp_link: e.target.value })}
+                  className="w-full border rounded px-3 py-2 md:col-span-2"
+                  required
+                />
+                <button type="submit" className="md:col-span-2 bg-blue-500 text-white py-2 rounded font-medium">
+                  Create Group
+                </button>
+              </form>
+            )}
+
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {groups.map((group) => (
                 <div key={group.id} className="bg-white rounded-2xl shadow p-4 transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
                   <h4 className="font-semibold">{group.name}</h4>
                   <p className="text-xs text-gray-600 mt-1">{group.description}</p>
-                  <p className="text-xs text-gray-500 mt-3">👥 {group.members_count || 0} members</p>
+                  <p className="text-xs text-gray-500 mt-3">{group.members_count || 0} members</p>
+                  {(group.whatsapp_link || group.whatsapp_url || group.invite_link || group.link) && (
+                    <a
+                      href={group.whatsapp_link || group.whatsapp_url || group.invite_link || group.link}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-block mt-3 text-xs font-medium bg-green-100 text-green-700 px-3 py-1 rounded"
+                    >
+                      Open WhatsApp Link
+                    </a>
+                  )}
                 </div>
               ))}
             </div>
@@ -943,3 +1036,4 @@ export default function AdminTab() {
     </div>
   );
 }
+

@@ -1,7 +1,7 @@
 import React from 'react';
 import { AiOutlineCalendar, AiOutlineShoppingCart, AiOutlineAreaChart, AiOutlineBarChart, AiOutlineStock } from 'react-icons/ai';
 import { FiShoppingBag, FiEdit, FiPieChart, FiBarChart, FiCreditCard, FiStar, FiShoppingCart } from 'react-icons/fi';
-import { BsKanban, BsBarChart, BsBoxSeam, BsCurrencyDollar, BsShield, BsChatLeft } from 'react-icons/bs';
+import { BsKanban, BsBarChart, BsBoxSeam, BsCurrencyDollar, BsShield, BsChatLeft, BsWhatsapp } from 'react-icons/bs';
 import { BiColorFill } from 'react-icons/bi';
 import { IoMdContacts } from 'react-icons/io';
 import { RiContactsLine, RiStockLine } from 'react-icons/ri';
@@ -492,13 +492,14 @@ export const links = [
         roles: ['admin', 'user'],
       },
       {
-        name: 'Volunteer',
-        icon: <IoMdContacts />,
-        roles: ['admin'],
-      },
-      {
         name: 'donations',
         icon: <AiOutlineShoppingCart />,
+        roles: ['admin', 'user'],
+      },
+      {
+        name: 'whatsapp',
+        label: 'WhatsApp Groups',
+        icon: <BsWhatsapp />,
         roles: ['admin', 'user'],
       },
       // {
@@ -506,6 +507,55 @@ export const links = [
       //   icon: <FiPieChart />,
       //   roles: ['admin'],
       // },
+    ],
+  },
+
+  {
+    title: 'Volunteer',
+    roles: ['admin'],
+    links: [
+      {
+        name: 'roles',
+        label: 'Roles',
+        path: 'volunteer/roles',
+        icon: <IoMdContacts />,
+        roles: ['admin'],
+      },
+      {
+        name: 'schedule',
+        label: 'Schedule',
+        path: 'volunteer/schedule',
+        icon: <IoMdContacts />,
+        roles: ['admin'],
+      },
+      {
+        name: 'announcements',
+        label: 'Announcements',
+        path: 'volunteer/announcements',
+        icon: <IoMdContacts />,
+        roles: ['admin'],
+      },
+      {
+        name: 'discussions',
+        label: 'Discussions',
+        path: 'volunteer/discussions',
+        icon: <IoMdContacts />,
+        roles: ['admin'],
+      },
+      {
+        name: 'reports',
+        label: 'Reports',
+        path: 'volunteer/reports',
+        icon: <IoMdContacts />,
+        roles: ['admin'],
+      },
+      {
+        name: 'admin',
+        label: 'Admin',
+        path: 'volunteer/admin',
+        icon: <IoMdContacts />,
+        roles: ['admin'],
+      },
     ],
   },
 
@@ -5878,3 +5928,4 @@ export const PyramidData = [
   { x: 'Fruits', y: 520, text: '520 cal' },
   { x: 'Bread, Rice, Pasta', y: 930, text: '930 cal' },
 ];
+
