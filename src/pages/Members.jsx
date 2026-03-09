@@ -202,11 +202,7 @@ const Members = () => {
         </p>
       </div>
 
-<<<<<<< HEAD
-      {isAdminUser && false && (
-=======
       {isAdminUser && (
->>>>>>> c34cbd09882f2cc43469ce0127c26fed8b4fecc2
         <form onSubmit={handleAddMember} className="bg-white rounded-xl shadow p-4 grid grid-cols-1 md:grid-cols-4 gap-3">
           <input
             type="text"

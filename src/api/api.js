@@ -30,10 +30,9 @@ export const adminLogin = (data) => API.post('/admin/login', data);
 export const getUsers = () => API.get('/admin/users');
 
 /* EVENTS */
-export const getEvents = () => API.get('/admin/event');
-export const createEvent = (data) => API.post('/admin/event', data);
-export const updateEvent = (id, data) => API.put(`/admin/event/${id}`, data);
-export const deleteEvent = (id) => API.delete(`/admin/event/${id}`);
+export const getEvents = () => API.get('/events/get.php');
+export const createEvent = (data) => API.post('/events/create.php', data);
+export const deleteEvent = (id) => API.delete(`/events/delete.php?id=${id}`);
 
 /* VOLUNTEER */
 export const getAnnouncements = () => API.get('/volunteer/announcements');

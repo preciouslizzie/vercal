@@ -1,9 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import API from '../../api/api';
-<<<<<<< HEAD
-import { getAllAttendance } from '../../api/adminApi';
-=======
->>>>>>> c34cbd09882f2cc43469ce0127c26fed8b4fecc2
 
 const toArray = (payload, keys = []) => {
   if (Array.isArray(payload)) return payload;
@@ -90,9 +86,6 @@ export default function Hours() {
       new Date(resolveRecordDate(b) || 0).getTime() - new Date(resolveRecordDate(a) || 0).getTime()
     ))
   ), [hoursList]);
-<<<<<<< HEAD
-  const [visibleHours, setVisibleHours] = useState([]);
-=======
   const visibleHours = useMemo(() => (
     sortedHours.filter((item) => {
       if (currentVolunteerIds.size === 0) return false;
@@ -111,7 +104,6 @@ export default function Hours() {
       return recordUserId && currentVolunteerIds.has(recordUserId);
     })
   ), [sortedHours, currentVolunteerIds]);
->>>>>>> c34cbd09882f2cc43469ce0127c26fed8b4fecc2
 
   useEffect(() => {
     let active = true;
@@ -204,27 +196,6 @@ export default function Hours() {
     };
   }, []);
 
-<<<<<<< HEAD
-  useEffect(() => {
-          async function fetchAdminReports() {
-            try {
-              const response = await getAllAttendance(); // Fetch data from the Admin Dashboard API
-              console.log('Admin Dashboard Attendance Data:', response.data); // Log the response to verify the structure
-
-              const attendanceList = toArray(response.data, ['attendance', 'items']);
-
-              // Directly use the data from the Admin Dashboard without filtering by user
-              setVisibleHours(attendanceList);
-            } catch (error) {
-              console.error('Error fetching admin reports:', error);
-            }
-          }
-
-          fetchAdminReports();
-        }, []);
-
-=======
->>>>>>> c34cbd09882f2cc43469ce0127c26fed8b4fecc2
   return (
     <section className="relative overflow-hidden rounded-3xl border border-slate-200 bg-gradient-to-br from-cyan-50 via-white to-emerald-50 p-5 md:p-7">
       <div className="absolute -right-16 -top-20 h-48 w-48 rounded-full bg-cyan-200/50 blur-3xl" />

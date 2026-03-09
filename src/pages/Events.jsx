@@ -26,7 +26,7 @@ function Events() {
       const formData = new FormData();
 
       formData.append('name', form.name);
-      formData.append('event', form.event);
+      formData.append('events', form.event);
       formData.append('date', form.date);
       formData.append('time', form.time);
       formData.append('venue', form.venue);
@@ -77,7 +77,7 @@ function Events() {
         <textarea
           className="border p-2 w-full rounded"
           placeholder="Event description"
-          value={form.event}
+          value={form.events}
           onChange={(e) => setForm({ ...form, event: e.target.value })}
         />
 
@@ -152,4 +152,3 @@ function Events() {
 }
 
 export default Events;
-I
