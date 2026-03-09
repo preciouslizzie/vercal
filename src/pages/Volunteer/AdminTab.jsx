@@ -1,11 +1,15 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import * as adminAPI from '../../api/adminApi';
+import { getAnnouncements as getVolunteerAnnouncements } from '../../api/api';
+import axios from 'axios';
 
 export default function AdminTab() {
   const [managementSection, setManagementSection] = useState(null);
   const [loading, setLoading] = useState(false);
   const [loadingSection, setLoadingSection] = useState('');
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
+  const successTimerRef = useRef(null);
 
   // Stats
   const [stats, setStats] = useState({
@@ -45,11 +49,9 @@ export default function AdminTab() {
     description: '',
     whatsapp_link: '',
   });
-
-  // Attendance State
-  const [attendance, setAttendance] = useState([]);
   const [showAttendanceForm, setShowAttendanceForm] = useState(false);
   const [attendanceForm, setAttendanceForm] = useState({
+    volunteer_id: '',
     date: new Date().toISOString().split('T')[0],
     hours: '',
   });
@@ -65,6 +67,23 @@ export default function AdminTab() {
     }
 
     return err?.message || fallback;
+  };
+
+  const isValidWhatsAppUrl = (value) => /^https?:\/\/(chat\.whatsapp\.com|wa\.me)\//i.test(value || '');
+  const getGroupWhatsAppLink = (group) => (
+    group?.whatsapp_link
+    || group?.whatsapp_url
+    || group?.invite_link
+    || group?.link
+    || ''
+  );
+  const showSuccess = (message) => {
+    setSuccessMessage(message);
+    if (successTimerRef.current) clearTimeout(successTimerRef.current);
+    successTimerRef.current = setTimeout(() => {
+      setSuccessMessage('');
+      successTimerRef.current = null;
+    }, 2500);
   };
 
   const toArray = (payload, nestedKeys = []) => {
@@ -254,6 +273,10 @@ export default function AdminTab() {
     loadStats();
   }, []);
 
+  useEffect(() => () => {
+    if (successTimerRef.current) clearTimeout(successTimerRef.current);
+  }, []);
+
   const loadStats = async () => {
     try {
       setLoading(true);
@@ -405,23 +428,110 @@ export default function AdminTab() {
           setError('Some schedule data is restricted for this account.');
         }
       } else if (section === 'announcements') {
-        const [annoRes, rolesRes] = await Promise.all([
+        const [annoRes, rolesRes] = await Promise.allSettled([
           adminAPI.getAnnouncements(),
           adminAPI.getRoles(),
         ]);
-        console.log("Announcements response:", annoRes.data);
-        setAnnouncements(
-  Array.isArray(annoRes.data)
-    ? annoRes.data
-    : annoRes.data?.announcements || []
-);
-        setRoles(toArray(rolesRes.data, ['roles', 'items']).map(normalizeRole).filter(Boolean));
+
+        let announcementsPayload = null;
+        let announcementErr = null;
+
+        if (annoRes.status === 'fulfilled') {
+          announcementsPayload = annoRes.value?.data;
+        } else {
+          announcementErr = annoRes.reason;
+          try {
+            // Fallback endpoint in case /admin/announcements is temporarily unreachable.
+            const fallback = await getVolunteerAnnouncements();
+            announcementsPayload = fallback?.data;
+            announcementErr = null;
+          } catch (fallbackErr) {
+            announcementErr = fallbackErr;
+          }
+        }
+
+        if (announcementErr) {
+          try {
+            // Legacy fallback endpoint used by some deployments.
+            const legacyBase = process.env.REACT_APP_API_URL || 'https://lizzy.altoservices.org/api';
+            const legacyRes = await axios.get(`${legacyBase}/volunteer/announcements/get.php`, {
+              headers: (() => {
+                const token = localStorage.getItem('admin_token')
+                  || localStorage.getItem('token')
+                  || localStorage.getItem('user_token')
+                  || '';
+                return token ? { Authorization: `Bearer ${token}` } : {};
+              })(),
+            });
+            announcementsPayload = legacyRes?.data;
+            announcementErr = null;
+          } catch (legacyErr) {
+            announcementErr = legacyErr;
+          }
+        }
+
+        if (announcementErr) {
+          setAnnouncements([]);
+          setError('Announcements are temporarily unavailable. Please try again.');
+        } else {
+          setAnnouncements(toArray(announcementsPayload, ['announcements', 'items']));
+        }
+
+        if (rolesRes.status === 'fulfilled') {
+          setRoles(toArray(rolesRes.value.data, ['roles', 'items']).map(normalizeRole).filter(Boolean));
+        } else {
+          setRoles([]);
+          setError('Announcements loaded, but roles could not be loaded.');
+        }
       } else if (section === 'groups') {
         const res = await adminAPI.getGroups();
-        setGroups(res.data || []);
+        setGroups(toArray(res.data, ['groups', 'items']));
       } else if (section === 'attendance') {
-        const res = await adminAPI.getAllAttendance();
-        setAttendance(res.data || []);
+        const [volunteersRes, usersRes, appsRes] = await Promise.allSettled([
+          adminAPI.getVolunteers(),
+          adminAPI.getUsers(),
+          adminAPI.getApplications(),
+        ]);
+
+        const normalizePeople = (list) =>
+          (Array.isArray(list) ? list : [])
+            .map((u) => {
+              const firstLast = [u?.first_name, u?.last_name].filter(Boolean).join(' ').trim();
+              const id = u?.id ?? u?.user_id ?? u?.volunteer_id;
+              const name = u?.name || u?.full_name || firstLast || u?.username || u?.email;
+              return id ? { ...u, id, name } : null;
+            })
+            .filter((u) => u && u.name);
+
+        const isAdminUser = (u) => {
+          const roleValue = String(u?.role || u?.user_type || u?.type || '').toLowerCase();
+          return u?.is_admin === true || roleValue === 'admin' || roleValue.includes('admin');
+        };
+
+        if (volunteersRes.status === 'fulfilled') {
+          const payload = volunteersRes.value?.data;
+          const normalized = Array.isArray(payload)
+            ? payload
+            : payload?.volunteers || payload?.users || payload?.data || [];
+          setUsers(normalizePeople(normalized).filter((u) => !isAdminUser(u)));
+        } else if (usersRes.status === 'fulfilled') {
+          const payload = usersRes.value?.data;
+          const normalized = Array.isArray(payload) ? payload : payload?.users || payload?.data || [];
+          const allUsers = normalizePeople(normalized).filter((u) => !isAdminUser(u));
+          const volunteerUsers = allUsers.filter((u) => {
+            const roleValue = String(u?.role || u?.user_type || u?.type || '').toLowerCase();
+            return u?.is_volunteer === true || roleValue === 'volunteer' || roleValue.includes('volunteer');
+          });
+          setUsers(volunteerUsers.length > 0 ? volunteerUsers : allUsers);
+        } else if (appsRes.status === 'fulfilled') {
+          const approvedUsers = toArray(appsRes.value?.data, ['applications', 'items'])
+            .filter((app) => app?.status === 'approved')
+            .map((app) => app?.user || app?.volunteer || app);
+          const uniqueUsers = Array.from(new Map(normalizePeople(approvedUsers).map((u) => [u.id, u])).values());
+          setUsers(uniqueUsers);
+        } else {
+          setUsers([]);
+        }
       }
 
     } catch (err) {
@@ -543,6 +653,9 @@ export default function AdminTab() {
     e.preventDefault();
     if (!groupForm.name.trim()) return alert('Group name required');
     if (!groupForm.whatsapp_link.trim()) return alert('WhatsApp group link required');
+    if (!isValidWhatsAppUrl(groupForm.whatsapp_link.trim())) {
+      return alert('Use a valid WhatsApp invite URL (chat.whatsapp.com or wa.me)');
+    }
 
     try {
       setError('');
@@ -571,18 +684,31 @@ export default function AdminTab() {
     if (!attendanceForm.volunteer_id || !attendanceForm.hours) return alert('Fill all fields');
     try {
       setError('');
+      const selectedVolunteerId = String(attendanceForm.volunteer_id || '').trim();
+      const selectedDate = String(attendanceForm.date || '').trim();
+      const parsedHours = Number(attendanceForm.hours);
+      if (!Number.isFinite(parsedHours) || parsedHours <= 0) {
+        return alert('Enter a valid number of hours');
+      }
+
       await adminAPI.logAttendance({
-        volunteer_id: attendanceForm.volunteer_id,
-        date: attendanceForm.date,
-        hours_worked: parseFloat(attendanceForm.hours),
+        userId: selectedVolunteerId,
+        hoursWorked: parsedHours,
+        attendanceDate: selectedDate || undefined,
+        user_id: selectedVolunteerId,
+        volunteer_id: selectedVolunteerId,
+        date: selectedDate,
+        attendance_date: selectedDate,
+        hours_worked: parsedHours,
+        hours: parsedHours,
       });
+
       setAttendanceForm({ volunteer_id: '', date: new Date().toISOString().split('T')[0], hours: '' });
       setShowAttendanceForm(false);
-      const res = await adminAPI.getAllAttendance();
-      setAttendance(res.data || []);
+      showSuccess('Report posted successfully.');
       loadStats();
     } catch (err) {
-      setError('Failed to log attendance: ' + parseApiError(err, 'Server error while logging attendance.'));
+      setError('Failed to post report: ' + parseApiError(err, 'Server error while posting report.'));
     }
   };
 
@@ -590,6 +716,11 @@ export default function AdminTab() {
   if (managementSection) {
     return (
       <div className="space-y-4">
+        {successMessage && (
+          <div className="fixed right-5 top-5 z-50 rounded-lg bg-emerald-600 px-4 py-3 text-sm font-medium text-white shadow-lg">
+            {successMessage}
+          </div>
+        )}
         <button
           onClick={() => setManagementSection(null)}
           className="bg-gray-500 text-white px-4 py-2 rounded font-medium hover:bg-gray-600"
@@ -852,80 +983,87 @@ export default function AdminTab() {
             )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {groups.map((group) => (
-                <div key={group.id} className="bg-white rounded-2xl shadow p-4 transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
-                  <h4 className="font-semibold">{group.name}</h4>
-                  <p className="text-xs text-gray-600 mt-1">{group.description}</p>
-                  <p className="text-xs text-gray-500 mt-3">{group.members_count || 0} members</p>
-                  {(group.whatsapp_link || group.whatsapp_url || group.invite_link || group.link) && (
-                    <a
-                      href={group.whatsapp_link || group.whatsapp_url || group.invite_link || group.link}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-block mt-3 text-xs font-medium bg-green-100 text-green-700 px-3 py-1 rounded"
-                    >
-                      Open WhatsApp Link
-                    </a>
-                  )}
-                </div>
-              ))}
+              {groups.map((group) => {
+                const whatsappLink = getGroupWhatsAppLink(group);
+                return (
+                  <div key={group.id} className="bg-white rounded-2xl shadow p-4 transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
+                    <h4 className="font-semibold">{group.name}</h4>
+                    <p className="text-xs text-gray-600 mt-1">{group.description}</p>
+                    <p className="text-xs text-gray-500 mt-3">{group.members_count || 0} members</p>
+                    {whatsappLink ? (
+                      <a
+                        href={whatsappLink}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-block mt-3 text-xs font-medium bg-green-100 text-green-700 px-3 py-1 rounded"
+                      >
+                        Open WhatsApp Link
+                      </a>
+                    ) : (
+                      <p className="text-xs text-amber-600 mt-3">WhatsApp link not yet added.</p>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
 
-        {/* ATTENDANCE */}
         {!loading && managementSection === 'attendance' && (
           <div className="space-y-4">
             <div className="flex justify-between items-center">
-              <h3 className="text-xl font-bold">📋 Attendance Logs</h3>
-              <button onClick={() => setShowAttendanceForm(!showAttendanceForm)} className="bg-blue-500 text-white px-4 py-2 rounded text-sm font-medium hover:bg-blue-600">
-                {showAttendanceForm ? 'Cancel' : '+ Log'}
+              <h3 className="text-xl font-bold">Report</h3>
+              <button
+                onClick={() => setShowAttendanceForm((prev) => !prev)}
+                className="bg-blue-500 text-white px-4 py-2 rounded text-sm font-medium hover:bg-blue-600"
+              >
+                {showAttendanceForm ? 'Cancel' : '+ Post'}
               </button>
             </div>
+
+            <p className="text-sm text-gray-600">
+              Hours worked
+            </p>
+
             {showAttendanceForm && (
               <form onSubmit={handleLogAttendance} className="bg-gray-50 rounded-lg p-4 space-y-3">
                 <select
-  value={attendanceForm.volunteer_id}
-  onChange={(e) =>
-    setAttendanceForm({ ...attendanceForm, volunteer_id: e.target.value })
-  }
->
-  <option value="">Select Volunteer</option>
-  {applications
-    .filter(app => app.status === 'approved')
-    .map(app => (
-      <option key={app.user.id} value={app.user.id}>
-        {app.user.name}
-      </option>
-  ))}
-</select>
-                <input type="date" value={attendanceForm.date} onChange={(e) => setAttendanceForm({ ...attendanceForm, date: e.target.value })} className="w-full border rounded px-3 py-2" required />
-                <input type="number" step="0.5" placeholder="Hours" value={attendanceForm.hours} onChange={(e) => setAttendanceForm({ ...attendanceForm, hours: e.target.value })} className="w-full border rounded px-3 py-2" required />
-                <button type="submit" className="w-full bg-blue-500 text-white py-2 rounded font-medium">Log</button>
+                  value={attendanceForm.volunteer_id}
+                  onChange={(e) => setAttendanceForm({ ...attendanceForm, volunteer_id: e.target.value })}
+                  className="w-full border rounded px-3 py-2"
+                  required
+                >
+                  <option value="">Select Volunteer</option>
+                  {users.map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.name}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="date"
+                  value={attendanceForm.date}
+                  onChange={(e) => setAttendanceForm({ ...attendanceForm, date: e.target.value })}
+                  className="w-full border rounded px-3 py-2"
+                  required
+                />
+                <input
+                  type="number"
+                  step="0.5"
+                  placeholder="Hours"
+                  value={attendanceForm.hours}
+                  onChange={(e) => setAttendanceForm({ ...attendanceForm, hours: e.target.value })}
+                  className="w-full border rounded px-3 py-2"
+                  required
+                />
+                <button type="submit" className="w-full bg-blue-500 text-white py-2 rounded font-medium">
+                  Report
+                </button>
               </form>
             )}
-            <div className="overflow-x-auto bg-white rounded-lg shadow">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-100 border-b">
-                  <tr>
-                    <th className="px-4 py-3 text-left">Volunteer</th>
-                    <th className="px-4 py-3 text-left">Date</th>
-                    <th className="px-4 py-3">Hours</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {attendance.map((record) => (
-                    <tr key={record.id} className="border-b hover:bg-gray-50">
-                      <td className="px-4 py-3">{record.volunteer?.name || 'N/A'}</td>
-                      <td className="px-4 py-3">{record.date?.split('T')[0]}</td>
-                      <td className="px-4 py-3 text-center">{record.hours_worked} hrs</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
           </div>
         )}
+
       </div>
     );
   }
@@ -933,6 +1071,11 @@ export default function AdminTab() {
   // Show Admin Dashboard Overview with stat cards
   return (
     <div className="space-y-6">
+      {successMessage && (
+        <div className="fixed right-5 top-5 z-50 rounded-lg bg-emerald-600 px-4 py-3 text-sm font-medium text-white shadow-lg">
+          {successMessage}
+        </div>
+      )}
       <h2 className="text-2xl font-bold">🔧 Admin Management Dashboard</h2>
 
       {error && (
@@ -1018,22 +1161,22 @@ export default function AdminTab() {
           </div>
         </button>
 
-        {/* Attendance Card */}
         <button
           onClick={() => loadSection('attendance')}
           disabled={!!loadingSection}
           className="bg-white p-5 sm:p-6 rounded-2xl shadow cursor-pointer transition-all duration-300 hover:shadow-xl hover:-translate-y-1 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 text-left border-l-4 border-green-500"
         >
-          <div className="text-4xl mb-3">📋</div>
-          <h3 className="font-bold text-lg mb-1">Attendance</h3>
-          <p className="text-sm text-gray-600 mb-3">Track volunteer hours</p>
-          <div className="flex items-baseline justify-between">
-            <span className="text-3xl font-bold text-green-600">{stats.hoursLogged.toFixed(1)}</span>
-            <span className="text-xs text-gray-500">{loadingSection === 'attendance' ? 'loading...' : 'hours'}</span>
-          </div>
+          <div className="text-4xl mb-3"></div>
+          <h3 className="font-bold text-lg mb-1">Post Report</h3>
+          <p className="text-sm text-gray-600 mb-3">Submit volunteer hours for reports</p>
+          {loadingSection === 'attendance' && (
+            <span className="text-xs text-gray-500">loading...</span>
+          )}
         </button>
+
       </div>
     </div>
   );
 }
+
 

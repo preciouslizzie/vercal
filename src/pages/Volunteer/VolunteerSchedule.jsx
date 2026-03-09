@@ -300,7 +300,7 @@ export default function Schedule() {
     <div className="space-y-4">
       <div className="rounded-2xl border border-slate-200 bg-gradient-to-r from-slate-50 to-white p-4">
         <h2 className="text-xl font-semibold text-slate-900">My Schedule</h2>
-        <p className="text-sm text-slate-600 mt-1">Your upcoming assignments and service details.</p>
+        <p className="text-sm text-slate-600 mt-1"></p>
       </div>
 
       {schedule.length === 0 && (

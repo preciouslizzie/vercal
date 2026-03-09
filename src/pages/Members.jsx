@@ -198,7 +198,7 @@ const Members = () => {
       <div>
         <h2 className="text-3xl font-bold text-gray-800">Church Members</h2>
         <p className="text-gray-600 mt-2">
-          Member records managed by Admin Panel are displayed here.
+          Member records 
         </p>
       </div>
 
