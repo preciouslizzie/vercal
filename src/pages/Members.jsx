@@ -202,45 +202,6 @@ const Members = () => {
         </p>
       </div>
 
-      {isAdminUser && (
-        <form onSubmit={handleAddMember} className="bg-white rounded-xl shadow p-4 grid grid-cols-1 md:grid-cols-4 gap-3">
-          <input
-            type="text"
-            placeholder="Full Name"
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-            className="border rounded px-3 py-2"
-            required
-          />
-          <input
-            type="email"
-            placeholder="Email"
-            value={form.email}
-            onChange={(e) => setForm({ ...form, email: e.target.value })}
-            className="border rounded px-3 py-2"
-            required
-          />
-          <select
-            value={form.role}
-            onChange={(e) => setForm({ ...form, role: e.target.value })}
-            className="border rounded px-3 py-2"
-          >
-            <option value="member">Member</option>
-            <option value="user">User</option>
-            <option value="volunteer">Volunteer</option>
-            <option value="worker">Worker</option>
-            <option value="leader">Leader</option>
-          </select>
-          <button
-            type="submit"
-            disabled={saving}
-            className="bg-blue-600 text-white rounded px-4 py-2 font-medium hover:bg-blue-700 disabled:opacity-60"
-          >
-            {saving ? 'Adding...' : 'Add Member'}
-          </button>
-        </form>
-      )}
-
       {loading ? (
         <div className="bg-white rounded-xl shadow p-8 text-center text-gray-600">Loading members...</div>
       ) : (

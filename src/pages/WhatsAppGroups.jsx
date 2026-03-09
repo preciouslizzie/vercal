@@ -205,6 +205,17 @@ export default function WhatsAppGroups() {
         />
       </div>
 
+      <div className="mb-5">
+        <a
+          href="https://wa.me/2348012345678"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-2 bg-emerald-500 text-white font-semibold px-4 py-2 rounded-lg hover:bg-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-300"
+        >
+          <BsWhatsapp className="text-xl" /> WhatsApp Me
+        </a>
+      </div>
+
       {error && (
         <div className="mb-5 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 px-4 py-3">
           {error}
