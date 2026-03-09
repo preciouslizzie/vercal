@@ -1,6 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import API from '../../api/api';
+<<<<<<< HEAD
 import { getAllAttendance } from '../../api/adminApi';
+=======
+>>>>>>> c34cbd09882f2cc43469ce0127c26fed8b4fecc2
 
 const toArray = (payload, keys = []) => {
   if (Array.isArray(payload)) return payload;
@@ -87,7 +90,28 @@ export default function Hours() {
       new Date(resolveRecordDate(b) || 0).getTime() - new Date(resolveRecordDate(a) || 0).getTime()
     ))
   ), [hoursList]);
+<<<<<<< HEAD
   const [visibleHours, setVisibleHours] = useState([]);
+=======
+  const visibleHours = useMemo(() => (
+    sortedHours.filter((item) => {
+      if (currentVolunteerIds.size === 0) return false;
+      const recordUserId = String(
+        item?.target_user_id
+        ?? item?.targetUserId
+        ?? item?.volunteer_user_id
+        ?? item?.user_id
+        ?? item?.volunteer_id
+        ?? item?.member_id
+        ?? item?.target_user?.id
+        ?? item?.volunteer?.id
+        ?? item?.user?.id
+        ?? '',
+      );
+      return recordUserId && currentVolunteerIds.has(recordUserId);
+    })
+  ), [sortedHours, currentVolunteerIds]);
+>>>>>>> c34cbd09882f2cc43469ce0127c26fed8b4fecc2
 
   useEffect(() => {
     let active = true;
@@ -180,6 +204,7 @@ export default function Hours() {
     };
   }, []);
 
+<<<<<<< HEAD
   useEffect(() => {
           async function fetchAdminReports() {
             try {
@@ -198,6 +223,8 @@ export default function Hours() {
           fetchAdminReports();
         }, []);
 
+=======
+>>>>>>> c34cbd09882f2cc43469ce0127c26fed8b4fecc2
   return (
     <section className="relative overflow-hidden rounded-3xl border border-slate-200 bg-gradient-to-br from-cyan-50 via-white to-emerald-50 p-5 md:p-7">
       <div className="absolute -right-16 -top-20 h-48 w-48 rounded-full bg-cyan-200/50 blur-3xl" />

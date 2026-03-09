@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import API from '../api/api'; // Corrected the import for the default export
-import { createEvent } from '../api/api'; // Importing the createEvent function
+import { getEvents, createEvent, deleteEvent } from '../api/api';
 
-function Event() {
-  const [event, setEvent] = useState([]);
+function Events() {
+  const [events, setEvents] = useState([]);
   const [form, setForm] = useState({
     name: '',
     event: '',
@@ -12,27 +11,22 @@ function Event() {
     venue: '',
     picture: null,
   });
-  const [isCreating, setIsCreating] = useState(false); // State to track loading
 
   useEffect(() => {
-    // No need to load events since the GET method is not supported for /api/admin/event
+    loadEvents();
   }, []);
 
-  const handleCreate = async () => {
-    setIsCreating(true); // Set loading state to true
-    try {
-      // Validation: Ensure all required fields are filled
-      if (!form.name || !form.event || !form.date || !form.time || !form.venue) {
-        console.error('All fields are required.');
-        alert('Please fill in all required fields.');
-        setIsCreating(false);
-        return;
-      }
+  const loadEvents = async () => {
+    const res = await getEvents();
+    setEvents(res.data);
+  };
 
+  const handleCreate = async () => {
+    try {
       const formData = new FormData();
 
       formData.append('name', form.name);
-      formData.append('event', form.event); // Ensure the correct field name is used
+      formData.append('event', form.event);
       formData.append('date', form.date);
       formData.append('time', form.time);
       formData.append('venue', form.venue);
@@ -41,9 +35,7 @@ function Event() {
         formData.append('picture', form.picture);
       }
 
-      console.log('Form Data:', Object.fromEntries(formData.entries())); // Log form data for debugging
-
-      const response = await createEvent(formData); // Use POST method to create event
+      await createEvent(formData);
 
       setForm({
         name: '',
@@ -54,28 +46,24 @@ function Event() {
         picture: null,
       });
 
-      // Manually add the created event to the state
-      setEvent((prevEvent) => [...prevEvent, response.data]);
+      loadEvents();
     } catch (error) {
       console.error(
         'Error creating event:',
         error.response ? error.response.data : error.message,
       );
-      alert(error.response?.data?.message || 'Failed to create event.');
-    } finally {
-      setIsCreating(false); // Reset loading state
     }
   };
 
   const handleDelete = async (id) => {
     if (!window.confirm('Delete this event?')) return;
     await deleteEvent(id);
-    setEvent((prevEvent) => prevEvent.filter((event) => event.id !== id));
+    loadEvents();
   };
 
   return (
     <div className="p-6">
-      <h2 className="text-2xl font-bold mb-4">📅 Event</h2>
+      <h2 className="text-2xl font-bold mb-4">📅 Events</h2>
 
       {/* ===== CREATE EVENT ===== */}
       <div className="space-y-3 mb-6">
@@ -123,10 +111,9 @@ function Event() {
 
         <button
           onClick={handleCreate}
-          className={`bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded ${isCreating ? 'opacity-50 cursor-not-allowed' : ''}`}
-          disabled={isCreating} // Disable button while loading
+          className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded"
         >
-          {isCreating ? 'Creating...' : 'Create Event'}
+          Create Event
         </button>
       </div>
 
@@ -165,3 +152,4 @@ function Event() {
 }
 
 export default Events;
+I
