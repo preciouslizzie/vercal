@@ -1,8 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import API from '../../api/api';
 
-const REPORT_CACHE_KEY = 'volunteer_report_cache_v1';
-
 const toArray = (payload, keys = []) => {
   if (Array.isArray(payload)) return payload;
   if (!payload || typeof payload !== 'object') return [];
@@ -147,12 +145,8 @@ export default function Hours() {
     const sources = [read('user')].filter((src) => {
       const role = normalizeRole(src?.role || src?.user_role || src?.userType || src?.type);
       return role !== 'admin' && role !== 'superadmin';
-    });
     for (const src of sources) {
       const values = [src?.id, src?.user_id, src?.volunteer_id, src?.member_id];
-      values.forEach((v) => {
-        if (v !== undefined && v !== null && String(v).trim() !== '') ids.add(String(v));
-      });
       const name = String(
         src?.name
         || src?.full_name
@@ -359,4 +353,5 @@ export default function Hours() {
       </div>
     </section>
   );
+});
 }

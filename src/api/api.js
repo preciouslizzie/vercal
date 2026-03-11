@@ -30,11 +30,17 @@ export const adminLogin = (data) => API.post('/admin/login', data);
 export const getUsers = () => API.get('/admin/users');
 
 /* EVENTS */
+<<<<<<< HEAD
 export const getEvents = () => API.getPublicEvents();
 export const getAdminEvents = () => API.getAdminEvents();
 export const createEvent = (data) => API.createEvent(data);
 export const updateEvent = (id, data) => API.updateEvent(id, data);
 export const deleteEvent = (id) => API.deleteEvent(id);
+=======
+export const getEvents = () => API.get('/events/get.php');
+export const createEvent = (data) => API.post('/events/create.php', data);
+export const deleteEvent = (id) => API.delete(`/events/delete.php?id=${id}`);
+>>>>>>> 63041c5871272aad10442429d863c11abdf2cd86
 
 /* VOLUNTEER */
 export const getAnnouncements = () => API.get('/volunteer/announcements');
@@ -96,6 +102,7 @@ API.createMember = (data) => API.post('/members', data);
 API.updateMember = (id, data) => API.put(`/members/${id}`, data);
 API.deleteMember = (id) => API.delete(`/members/${id}`);
 
+<<<<<<< HEAD
 API.getPublicEvents = async () => {
   return API.get('/event');
 };
@@ -159,12 +166,18 @@ API.deleteEvent = async (id) => {
 };
 
 API.getEvents = () => API.getPublicEvents();
+=======
+API.getEvents = () => API.get('/event');
+API.createEvent = (data) => API.post('/event', data);
+API.deleteEvent = (id) => API.delete(`/event/${id}`);
+>>>>>>> 63041c5871272aad10442429d863c11abdf2cd86
 
 API.getSermons = () => API.get('/audio');
 API.createSermon = (data) => API.post('/audio', data);
 API.updateSermon = (id, data) => API.put(`/audio/${id}`, data);
 API.deleteSermon = (id) => API.delete(`/audio/${id}`);
 
+<<<<<<< HEAD
 API.getBlogs = async () => {
   try {
     return await API.get('/admin/blogs');
@@ -212,6 +225,19 @@ API.deleteBlog = async (id) => {
     return API.delete(`/blog/${id}`);
   }
 };
+=======
+API.getBlogs = () => API.get('/blogs');
+
+API.createBlog = (data) => API.post('/blogs', data, {
+  headers: { 'Content-Type': 'multipart/form-data' },
+});
+
+API.updateBlog = (id, data) => API.put(`/blog/${id}`, data, {
+  headers: { 'Content-Type': 'multipart/form-data' },
+});
+
+API.deleteBlog = (id) => API.delete(`/blog/${id}`);
+>>>>>>> 63041c5871272aad10442429d863c11abdf2cd86
 
 API.getWhatsAppLinks = () => API.get('/whatsapp-links');
 
