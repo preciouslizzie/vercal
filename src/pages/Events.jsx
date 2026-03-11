@@ -70,7 +70,7 @@ function Events() {
     <div className="p-6">
       <h2 className="text-2xl font-bold mb-4">📅 Events</h2>
 
-      {/* ===== CREATE EVENT ===== */}
+      
       <div className="space-y-3 mb-6">
         <input
           className="border p-2 w-full rounded"
@@ -123,7 +123,7 @@ function Events() {
         </button>
       </div>
 
-      {/* ===== EVENT LIST ===== */}
+      
       {events.map((event) => (
         <div
           key={event.id}
